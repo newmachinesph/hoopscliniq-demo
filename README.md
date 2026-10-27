@@ -43,7 +43,7 @@ The routes are the core loop only: `/`, `/demo`, `/playbook`, `/plays/new`, `/pl
 
 ## Where the backend plugs in
 
-The backend (Modal + SAM 3.1 + Muse Spark on the Meta API + Muse Spark Open on Baseten) lives in its own repo. These three route handlers return mock data today, each with an `x-demo: mock` header. Replace their bodies with calls to the backend and keep the shapes, or point the UI at the backend directly.
+The backend (Modal + SAM 3.1 + Muse Spark on the Meta API + Muse Spark Open on Baseten) lives in its own repo. These three route handlers return mock data today, each with an `x-demo: mock` header. Set the server-only env var `HOOPSCLINIQ_API_URL` (no `NEXT_PUBLIC`; see `.env.example`) and they proxy to `<url>/film/upload`, `<url>/film/jobs/<id>` and `<url>/cliniq/ask` with a 25 s timeout, passing the status and JSON through with `x-demo: live`. On a network error, timeout or 5xx they fall back to the mock with `x-demo: mock` and an `x-demo-fallback: <reason>` header; the existing 400 validation runs before proxying. Unset, they return the mock as before.
 
 | Route                    | Request                                 | Response today (mock)                                                                                                                        |
 | ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
