@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "dictionary": "1.5",
+  "model": "authored",
+  "play": "03-horns-twist",
+  "play_fingerprint": "3b519a88852cc432",
+  "verified_name": null,
+  "teams_visible": null,
+  "shot_type": {
+    "id": "layup",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "play_type": {
+    "id": "pnr_roll_man",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "set_name": {
+    "id": "custom",
+    "custom_label": "Horns Twist",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "base_defense": {
+    "id": "man_to_man",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "screen_defense": {
+    "id": "hedge",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "verdicts": [],
+  "extra_actions": [],
+  "hook": "Jump the first screen, get twisted.",
+  "lines": [
+    "Horns. The 1 up top, bigs at both elbows, shooters in the corners.",
+    "The 1 attacks right off the 5. The big shows to stop him.",
+    "Then he snaps back left, and the 4 screens again.",
+    "The other big jumped out too. The 4 rolls behind him for the bounce pass.",
+    "Layup. Jump the first screen, and the second one burns you."
+  ]
+}

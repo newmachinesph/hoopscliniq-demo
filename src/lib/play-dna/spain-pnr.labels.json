@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "dictionary": "1.5",
+  "model": "authored",
+  "play": "01-spain-pnr",
+  "play_fingerprint": "ff97c4c138fd403d",
+  "verified_name": null,
+  "teams_visible": null,
+  "shot_type": {
+    "id": "dunk",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "play_type": {
+    "id": "pnr_roll_man",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "set_name": {
+    "id": "spain_pnr",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "base_defense": {
+    "id": "man_to_man",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "screen_defense": {
+    "id": "drop",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "verdicts": [],
+  "extra_actions": [],
+  "hook": "They screen the big. Free dunk.",
+  "lines": [
+    "Spain. The 1 up top, the 5 at the nail, the 2 tucked behind.",
+    "The 5 sets the ball screen. His man drops into the lane.",
+    "Now the 2 back-screens that dropping big.",
+    "The 1 drives right, and the 5 rolls down the middle.",
+    "The big is trailing the roll. Lob it over him.",
+    "Dunk. The big is three feet behind.",
+    "Facing a drop big? Screen him, then roll to the rim."
+  ]
+}

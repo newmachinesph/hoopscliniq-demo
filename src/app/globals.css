@@ -1,0 +1,392 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+
+/* Design tokens: copied from hoops-cliniq/design/tokens.css (source of truth). Edit there first. */
+/*
+ * Hoops ClinIQ design tokens (Tailwind CSS v4). Proposed 2026-10-23; see design/DIRECTION.md.
+ * Use: in globals.css, `@import "tailwindcss";` then `@import "./tokens.css";`.
+ * Theme: <html class="light"> or <html class="dark"> for explicit choice; no class = System.
+ * The class must sit on <html> so the @theme aliases below resolve per theme.
+ * Expo (P2) reads the same hex values; export them to JS then.
+ *
+ * Contrast (WCAG 2.x, computed):
+ *   Light  text-primary #001C3F on background #F7F8FA  15.96:1  (on surface-1 #FFFFFF 16.96:1)
+ *   Light  primary-foreground #FFFFFF on primary #B5532A  4.96:1
+ *          FIX: #C85F32 as a fill gives 4.09:1 with white (and 4.15:1 with navy), which fails AA for labels.
+ *          #C85F32 is kept as --brand-orange for non-text marks only (4.09:1 on white, 3:1 is enough there).
+ *   Dark   text-primary #E6EAF2 on background #0B1626  15.05:1
+ *   Dark   primary-foreground #001C3F on primary #E97833  5.82:1
+ *   Other fixes: light success #1E7A46 -> #1A6E3F and warning #B7791F/#9A6212 -> #8A570F (fail 4.5:1 on their own
+ *   14% chip tint); court lines stay navy in dark (cream on hardwood is 1.76:1).
+ */
+
+/* Dark variant: explicit .dark, or System when the OS is dark and the user did not pick Light. */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not(.light), :root:not(.light) *) {
+      @slot;
+    }
+  }
+}
+
+/* ---------- Light (default) ---------- */
+:root {
+  color-scheme: light;
+
+  /* Brand: fixed reference values; use the semantic tokens below in components */
+  --brand-navy: #001c3f;
+  --brand-orange: #c85f32; /* non-text marks: playhead line, focus ring, meter, active nav, chart-1 */
+
+  /* Surfaces: page/chrome, panel/card, subtle fill, overlay */
+  --background: #f7f8fa;
+  --surface-1: #ffffff;
+  --surface-2: #f1f3f6;
+  --surface-3: #ffffff;
+
+  /* Borders: hairline dividers; strong = input outlines (3.62:1 on white) */
+  --border: rgba(0, 28, 63, 0.12);
+  --border-strong: #7d879a;
+
+  /* Text: primary 16.96:1, secondary 7.53:1, muted 5.88:1 on white; disabled is exempt */
+  --text-primary: #001c3f;
+  --text-secondary: #4a5568;
+  --text-muted: #5b6577;
+  --text-disabled: rgba(0, 28, 63, 0.38);
+
+  /* Primary action: the one orange fill per view */
+  --primary: #b5532a;
+  --primary-hover: #a34a24;
+  --primary-foreground: #ffffff;
+
+  /* Accent = shadcn hover/selected tint (not a second brand color); selection-tint = selected nav/row */
+  --accent: rgba(0, 28, 63, 0.05);
+  --accent-foreground: var(--text-primary);
+  --selection-tint: rgba(200, 95, 50, 0.08);
+
+  /* Status: text-safe on surface-1 and on their own 14% tint; foreground for solid fills */
+  --success: #1a6e3f;
+  --warning: #8a570f;
+  --danger: #b42318;
+  --info: #2e5aac;
+  --status-foreground: #ffffff;
+
+  /* Focus ring: 2px, 2px offset in --background */
+  --focus-ring: var(--brand-orange);
+
+  /* Court canvas: identical court in both themes; only the wrapper and grid change */
+  --court-floor: #e0b182;
+  --court-lines: #001c3f; /* 8.71:1 on floor */
+  --court-wrapper: #eef0f3;
+  --court-grid: rgba(0, 28, 63, 0.12);
+
+  /* Editor marks: playhead (orange, time), canvas selection (navy outline, never orange) */
+  --playhead: var(--primary);
+  --playhead-foreground: var(--primary-foreground);
+  --selection: #001c3f;
+
+  /* AI: no new hue; spark + label in text color, proposals get a faint neutral tint */
+  --ai-mark: var(--text-primary);
+  --ai-surface: rgba(0, 28, 63, 0.04);
+
+  /* Charts: series 1 follows brand orange, 2-5 are the same in both themes (at least 3:1 on both panels) */
+  --chart-1: var(--brand-orange);
+  --chart-2: #5b7db8;
+  --chart-3: #2f8f83;
+  --chart-4: #9a7bc4;
+  --chart-5: #808a9d;
+
+  /* Elevation: light = border first, shadow only for hover, popovers, modals */
+  --elevation-1: 0 1px 2px rgba(0, 28, 63, 0.06);
+  --elevation-2: 0 8px 24px rgba(0, 28, 63, 0.12);
+  --elevation-3: 0 16px 48px rgba(0, 28, 63, 0.18);
+
+  /* Motion: UI 120-200ms ease-out, no bounce; zeroed under reduced motion */
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 200ms;
+  --duration-sheet: 280ms;
+
+  /* Layout: shell and editor sizes from DIRECTION.md */
+  --sidebar-width: 240px;
+  --sidebar-rail: 56px;
+  --topbar-height: 48px;
+  --editor-left: 240px;
+  --inspector-width: 280px;
+  --timeline-height: 120px;
+  --touch-target: 44px;
+  --touch-target-courtside: 48px;
+}
+
+/* ---------- Dark (explicit) ---------- */
+.dark {
+  color-scheme: dark;
+  --brand-orange: #e97833;
+
+  /* Surfaces: navy-black page, each step lighter; depth from surface + border, not shadow */
+  --background: #0b1626;
+  --surface-1: #111d31;
+  --surface-2: #17253d;
+  --surface-3: #1e2e4a;
+
+  /* Borders: hairline; strong = input outlines (3.33:1 on surface-1) */
+  --border: rgba(230, 234, 242, 0.1);
+  --border-strong: #5c6f92;
+
+  /* Text: primary 15.05:1, secondary 8.12:1, muted 6.08:1 on background (4.55:1 on surface-3) */
+  --text-primary: #e6eaf2;
+  --text-secondary: #a3aec2;
+  --text-muted: #8a96ab;
+  --text-disabled: rgba(230, 234, 242, 0.38);
+
+  /* Primary action: orange fill with navy label */
+  --primary: #e97833;
+  --primary-hover: #f08a4b;
+  --primary-foreground: #001c3f;
+
+  /* Accent and selection tints */
+  --accent: rgba(230, 234, 242, 0.06);
+  --selection-tint: rgba(233, 120, 51, 0.1);
+
+  /* Status: lighter pairs; dark foreground on solid fills */
+  --success: #4cc283;
+  --warning: #e8b04b;
+  --danger: #f0705f;
+  --info: #7fa6ee;
+  --status-foreground: #0b1626;
+
+  /* Court: same floor and lines; darker-than-chrome wrapper so the court pops */
+  --court-wrapper: #070f1b;
+  --court-grid: rgba(230, 234, 242, 0.1);
+
+  /* Canvas selection flips to near-white */
+  --selection: #e6eaf2;
+
+  /* AI tint */
+  --ai-surface: rgba(230, 234, 242, 0.04);
+
+  /* Elevation: borders, not shadows */
+  --elevation-1: 0 0 0 1px rgba(230, 234, 242, 0.1);
+  --elevation-2: 0 0 0 1px rgba(230, 234, 242, 0.12);
+  --elevation-3: 0 0 0 1px rgba(230, 234, 242, 0.14);
+}
+
+/* ---------- Dark (System): same values as .dark, unless the user picked Light ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --brand-orange: #e97833;
+    --background: #0b1626;
+    --surface-1: #111d31;
+    --surface-2: #17253d;
+    --surface-3: #1e2e4a;
+    --border: rgba(230, 234, 242, 0.1);
+    --border-strong: #5c6f92;
+    --text-primary: #e6eaf2;
+    --text-secondary: #a3aec2;
+    --text-muted: #8a96ab;
+    --text-disabled: rgba(230, 234, 242, 0.38);
+    --primary: #e97833;
+    --primary-hover: #f08a4b;
+    --primary-foreground: #001c3f;
+    --accent: rgba(230, 234, 242, 0.06);
+    --selection-tint: rgba(233, 120, 51, 0.1);
+    --success: #4cc283;
+    --warning: #e8b04b;
+    --danger: #f0705f;
+    --info: #7fa6ee;
+    --status-foreground: #0b1626;
+    --court-wrapper: #070f1b;
+    --court-grid: rgba(230, 234, 242, 0.1);
+    --selection: #e6eaf2;
+    --ai-surface: rgba(230, 234, 242, 0.04);
+    --elevation-1: 0 0 0 1px rgba(230, 234, 242, 0.1);
+    --elevation-2: 0 0 0 1px rgba(230, 234, 242, 0.12);
+    --elevation-3: 0 0 0 1px rgba(230, 234, 242, 0.14);
+  }
+}
+
+/* Reduced motion: all UI durations to 0 (user-started play playback is driven by its own clock) */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-sheet: 0ms;
+  }
+}
+
+/* ---------- Tailwind utilities: colors (shadcn names + ours), resolved at runtime per theme ---------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--text-primary);
+  --color-foreground-secondary: var(--text-secondary);
+  --color-muted-foreground: var(--text-muted);
+  --color-disabled-foreground: var(--text-disabled);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-card: var(--surface-1);
+  --color-card-foreground: var(--text-primary);
+  --color-popover: var(--surface-3);
+  --color-popover-foreground: var(--text-primary);
+  --color-muted: var(--surface-2);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text-primary);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-navy: var(--brand-navy);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--border-strong);
+  --color-ring: var(--focus-ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-destructive: var(--danger);
+  --color-info: var(--info);
+  --color-status-foreground: var(--status-foreground);
+  --color-selection: var(--selection);
+  --color-selection-tint: var(--selection-tint);
+  --color-court-floor: var(--court-floor);
+  --color-court-lines: var(--court-lines);
+  --color-court-wrapper: var(--court-wrapper);
+  --color-court-grid: var(--court-grid);
+  --color-playhead: var(--playhead);
+  --color-playhead-foreground: var(--playhead-foreground);
+  --color-ai-mark: var(--ai-mark);
+  --color-ai-surface: var(--ai-surface);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--background);
+  --color-sidebar-foreground: var(--text-primary);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--accent);
+  --color-sidebar-accent-foreground: var(--text-primary);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--focus-ring);
+
+  /* Elevation utilities: shadow-1..3 */
+  --shadow-1: var(--elevation-1);
+  --shadow-2: var(--elevation-2);
+  --shadow-3: var(--elevation-3);
+}
+
+/* ---------- Tailwind theme: type, radius, motion easing (same in both themes) ---------- */
+@theme {
+  /* Font: Outfit everywhere in the app; use `tabular-nums` on numbers (Outfit's default digits are proportional) */
+  --font-sans: var(--font-outfit, "Outfit"), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+
+  /* Type scale (size / line height): web body is base 14px, mobile body is md 16px */
+  --text-xs: 0.75rem; /* 12: labels, chips, ruler */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem; /* 13: table cells, meta */
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.875rem; /* 14: web body */
+  --text-base--line-height: 1.25rem;
+  --text-md: 1rem; /* 16: mobile body, inputs on phone (avoids iOS zoom) */
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.125rem; /* 18: card titles */
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem; /* 20: section titles */
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem; /* 24: page titles */
+  --text-2xl--line-height: 1.875rem;
+  --text-3xl: 1.875rem; /* 30: KPI numerals */
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem; /* 36: hero numbers, quiz result */
+  --text-4xl--line-height: 2.5rem;
+
+  /* Spacing: Tailwind's 4px base (--spacing: 0.25rem) is kept; use 0,2,4,8,12,16,20,24,32,40,48,64 */
+  --spacing: 0.25rem;
+
+  /* Radius: chips 4, inputs/buttons 6, panels 8, cards/tool rail 12, sheets/modals 16 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Easing: ease-out for UI, linear for scrubbing */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* shadcn base radius (components read --radius) */
+:root {
+  --radius: 8px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Touch: every compact control gets a 44px hit area without changing how it looks (DIRECTION Accessibility, "44px
+ * minimum hit area everywhere, including 32px web controls on touch devices"). ::before is free on these primitives;
+ * ::after is taken by tab indicators and the switch / checkbox hit areas.
+ */
+@media (pointer: coarse) {
+  :where(
+      [data-slot="button"],
+      [data-slot="select-trigger"],
+      [data-slot="tabs-trigger"],
+      [data-slot="toggle"],
+      [data-slot="toggle-group-item"],
+      [data-slot="switch"],
+      [data-slot="checkbox"],
+      [data-slot="radio-group-item"],
+      [role="radiogroup"] > button,
+      button[aria-pressed],
+      button[aria-label],
+      [data-hit]
+    ):not(.absolute, .fixed, .sticky) {
+    position: relative;
+  }
+  :where(
+      [data-slot="button"],
+      [data-slot="select-trigger"],
+      [data-slot="tabs-trigger"],
+      [data-slot="toggle"],
+      [data-slot="toggle-group-item"],
+      [data-slot="switch"],
+      [data-slot="checkbox"],
+      [data-slot="radio-group-item"],
+      [role="radiogroup"] > button,
+      button[aria-pressed],
+      button[aria-label],
+      [data-hit]
+    )::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}

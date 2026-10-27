@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "dictionary": "1.5",
+  "model": "authored",
+  "play": "09-floppy",
+  "play_fingerprint": "76e60168087f6aef",
+  "verified_name": null,
+  "teams_visible": null,
+  "shot_type": {
+    "id": "jump_shot",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "play_type": {
+    "id": "off_screen",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "set_name": {
+    "id": "floppy",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "base_defense": {
+    "id": "man_to_man",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "screen_defense": {
+    "id": "none",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "verdicts": [],
+  "extra_actions": [],
+  "hook": "Which side? The defense can't know.",
+  "lines": [
+    "Floppy. The 2 under the rim, a double on the right, a single left.",
+    "He picks the double, and his man gets pinned in the lane.",
+    "The 1 hits him on the wing.",
+    "Wing three. The closest defender is fourteen feet away.",
+    "Trail him and he curls. Cheat, and he pops."
+  ]
+}

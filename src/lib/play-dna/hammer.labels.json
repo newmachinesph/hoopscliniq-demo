@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "dictionary": "1.5",
+  "model": "authored",
+  "play": "05-hammer",
+  "play_fingerprint": "7d4fe58b91c34a19",
+  "verified_name": null,
+  "teams_visible": null,
+  "shot_type": {
+    "id": "jump_shot",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "play_type": {
+    "id": "spot_up",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "set_name": {
+    "id": "hammer",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "base_defense": {
+    "id": "man_to_man",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "screen_defense": {
+    "id": "none",
+    "custom_label": "",
+    "confidence": "high",
+    "why": "Authored play."
+  },
+  "verdicts": [],
+  "extra_actions": [],
+  "hook": "Help turns its head. The hammer drops.",
+  "lines": [
+    "Hammer. The 1 on the right wing, the 5 at the elbow, the shooter left.",
+    "The 5 screens, and the 1 drives the baseline.",
+    "The 4 screens the shooter's man while he sags into the paint.",
+    "The 1 skips it across the baseline, under the help.",
+    "Corner three. His man is twelve feet away at the catch.",
+    "When weak-side help sags to the drive, hammer it and skip."
+  ]
+}
