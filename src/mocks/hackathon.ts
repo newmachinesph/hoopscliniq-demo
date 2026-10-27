@@ -58,7 +58,7 @@ export const modelRows: ModelRow[] = [
       "Jersey crops so the coach confirms who is who",
       "Consent mask: hide a player without guardian consent",
     ],
-    status: "planned",
+    status: "live",
   },
   {
     id: "spark",
@@ -69,7 +69,7 @@ export const modelRows: ModelRow[] = [
       "Write quiz questions for player study",
       "ClinIQ tool calls (fetch_play, fetch_clip, fetch_stat); no source, no answer",
     ],
-    status: "planned",
+    status: "live",
   },
   {
     id: "spark-open",
@@ -83,7 +83,7 @@ export const modelRows: ModelRow[] = [
     name: "Modal",
     host: "GPU jobs",
     jobs: ["Video pipeline: ffmpeg frames, SAM tracking, play-dna JSON", "Eval harness against hand-labelled clips"],
-    status: "planned",
+    status: "live",
   },
   {
     id: "muse-code",
@@ -115,9 +115,9 @@ export interface PipelineStep {
 /** Upload → Frames (Modal) → Track (SAM 3.1) → Name (Muse Spark) → Review → Cite (ClinIQ). */
 export const pipelineSteps: PipelineStep[] = [
   { id: "upload", label: "Upload", engine: "Phone or file", status: "in-preview", href: "/film/record" },
-  { id: "frames", label: "Frames", engine: "Modal", status: "planned", href: "/#models" },
-  { id: "track", label: "Track", engine: "SAM 3.1", status: "planned", href: "/#models" },
-  { id: "name", label: "Name", engine: "Muse Spark", status: "planned", href: "/#models" },
+  { id: "frames", label: "Frames", engine: "Modal", status: "live", href: "/#models" },
+  { id: "track", label: "Track", engine: "SAM 3.1", status: "live", href: "/#models" },
+  { id: "name", label: "Name", engine: "Muse Spark", status: "live", href: "/#models" },
   { id: "review", label: "Review", engine: "Coach confirms", status: "beta", href: "/film/review" },
   { id: "cite", label: "Cite", engine: "ClinIQ", status: "in-preview", href: "/cliniq" },
 ]
@@ -226,7 +226,7 @@ export const demoFlow: DemoStep[] = [
       "Ask ClinIQ about your own film: every claim links to the exact clip, play or stat, or it says it has no source.",
     href: `/cliniq?q=${encodeURIComponent(hackathon.demoQuestion)}`,
     cta: "Ask the demo question",
-    strip: [fromPipeline("cite"), { label: "Answers · Muse Spark", status: "planned" }],
+    strip: [fromPipeline("cite"), { label: "Answers · Muse Spark", status: "live" }],
   },
   {
     id: "study",
