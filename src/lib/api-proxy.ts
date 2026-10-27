@@ -5,6 +5,8 @@ type ProxyInit = {
   method: "GET" | "POST"
   headers?: HeadersInit
   body?: BodyInit
+  /** Per-route override; ClinIQ answers can take Muse Spark 30–60 s. */
+  timeoutMs?: number
 }
 
 // Server-only: HOOPSCLINIQ_API_URL has no NEXT_PUBLIC prefix, so it never reaches the browser bundle.
@@ -15,7 +17,7 @@ export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response)
   if (!base) return mockResponse()
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? TIMEOUT_MS)
   try {
     const upstream = await fetch(`${base}${init.path}`, {
       method: init.method,

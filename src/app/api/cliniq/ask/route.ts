@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ question: trimmed }),
+      timeoutMs: 55_000,
     },
     () => Response.json(mockAsk(trimmed), { headers }),
   )
