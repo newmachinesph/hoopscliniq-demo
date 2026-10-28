@@ -114,7 +114,7 @@ export interface PipelineStep {
 
 /** Upload → Frames (Modal) → Track (SAM 3.1) → Name (Muse Spark) → Review → Cite (ClinIQ). */
 export const pipelineSteps: PipelineStep[] = [
-  { id: "upload", label: "Upload", engine: "Phone or file", status: "in-preview", href: "/film/record" },
+  { id: "upload", label: "Upload", engine: "Phone or file", status: "live", href: "/film?upload=1" },
   { id: "frames", label: "Frames", engine: "Modal", status: "live", href: "/#models" },
   { id: "track", label: "Track", engine: "SAM 3.1", status: "live", href: "/#models" },
   { id: "name", label: "Name", engine: "Muse Spark", status: "live", href: "/#models" },
@@ -153,16 +153,39 @@ export function mockUploadJob() {
   }
 }
 
-/** A finished job: tracks and play-dna from the hand-drawn Horns Twist play, standing in for SAM output. */
+/** Step status as the backend reports it: the machine steps are done, review and cite belong to the coach. */
+const mockStepStatus = (id: PipelineStep["id"]) => (id === "review" || id === "cite" ? "planned" : "done")
+
+/**
+ * A finished job: tracks and play-dna from the hand-drawn Horns Twist play, standing in for SAM output. No `clipUrl` or
+ * `overlay`: mock mode shows the court only.
+ */
 export function mockJob(jobId: string) {
   const dna = dnaPlays.find((p) => p.id === "horns-twist")
   return {
     jobId,
     status: "done" as const,
     finishedAt: at(0, "14:38"),
-    steps: pipelineSteps.map((s) => ({ id: s.id, label: s.label, engine: s.engine, status: s.status })),
-    suggestedName: { playId: "horns-twist", title: dna?.title ?? "Horns Twist", needsReview: true },
+    steps: pipelineSteps.map((s) => ({ id: s.id, label: s.label, engine: s.engine, status: mockStepStatus(s.id) })),
+    suggestedName: {
+      playId: "horns-twist",
+      title: dna?.title ?? "Horns Twist",
+      confidence: "medium" as const,
+      why: "Sample answer: two bigs at the elbows, then the guard comes off a screen. Nothing was analyzed.",
+      needsReview: true,
+    },
     playDna: dna?.play ?? null,
+    error: null,
+    clipUrl: null,
+    overlay: null,
+  }
+}
+
+/** GET /film/jobs: the mock job is the only finished analysis. */
+export function mockRecentJobs() {
+  const job = mockJob(MOCK_JOB_ID)
+  return {
+    jobs: [{ jobId: job.jobId, finishedAt: job.finishedAt, title: job.suggestedName.title, playersFound: 10 }],
   }
 }
 
@@ -203,10 +226,10 @@ export const demoFlow: DemoStep[] = [
   {
     id: "record",
     title: "Record",
-    sentence: "Film the game on a phone from high in the stands and tap play names as they happen.",
-    href: "/film/record",
-    cta: "Open Record",
-    more: { href: "/film", label: "Film library" },
+    sentence: "Film the game on a phone from high in the stands, or send a clip of up to 60 seconds to the pipeline.",
+    href: "/film?upload=1",
+    cta: "Analyze a clip",
+    more: { href: "/film/record", label: "Open Record" },
     strip: [fromPipeline("upload")],
   },
   {

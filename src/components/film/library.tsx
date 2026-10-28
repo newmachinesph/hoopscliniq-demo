@@ -24,6 +24,7 @@ import { type FilmKind, filmSummary, films, type UploadRow, uploadQueue } from "
 import { org } from "@/data/org"
 import { cn } from "@/lib/utils"
 import { FilmCard } from "./film-card"
+import { RecentAnalyses } from "./recent-analyses"
 import { type NewUpload, UploadDialog } from "./upload-dialog"
 
 type Filter = "all" | FilmKind
@@ -88,8 +89,9 @@ export function FilmLibrary({ openUpload = false }: { openUpload?: boolean }) {
         note: u.held ? "Held until consent" : undefined,
       },
     ])
-    toast(u.held ? "Preview: upload held, not stored" : "Preview: upload not stored", {
-      description: u.held ? "It starts when the guardian agrees. Nothing is stored until then." : u.name,
+    // Only a held upload lands here: everything else goes to the pipeline and its job page.
+    toast("Preview: upload held, not stored", {
+      description: "It starts when the guardian agrees. Nothing is stored until then.",
     })
   }
 
@@ -108,11 +110,13 @@ export function FilmLibrary({ openUpload = false }: { openUpload?: boolean }) {
               <DeviceMobileCameraIcon aria-hidden /> Record on phone
             </Link>
             <Button onClick={() => setUploadOpen(true)} className="h-11 sm:h-8">
-              <UploadSimpleIcon weight="bold" aria-hidden /> Upload video
+              <UploadSimpleIcon weight="bold" aria-hidden /> Analyze a clip
             </Button>
           </>
         }
       />
+
+      <RecentAnalyses />
 
       <PipelineStrip />
 

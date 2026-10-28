@@ -51,8 +51,9 @@ export function PipelineStrip({ compact = false, className }: { compact?: boolea
       </ol>
       {!compact && (
         <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground text-pretty">
-          Today every step runs on sample data: upload and record show &ldquo;Preview&rdquo; and store nothing, tags are
-          the demo team&rsquo;s, and ClinIQ answers are canned with real citations into this app.
+          Upload sends one clip through Modal, SAM 3.1 and Muse Spark. Record shows &ldquo;Preview&rdquo; and stores
+          nothing, the library&rsquo;s tags are the demo team&rsquo;s, and ClinIQ answers are canned with real citations
+          into this app.
         </p>
       )}
     </section>

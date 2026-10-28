@@ -3,6 +3,9 @@ import { proxyOrMock } from "@/lib/api-proxy"
 
 // Proxies to the backend's POST /film/upload (which starts a Modal job and returns its id) when
 // HOOPSCLINIQ_API_URL is set; otherwise, or on failure, returns the mock. The mock never reads the body.
+// A 60 MB clip can take longer than the default proxy timeout to reach Modal.
+const UPLOAD_TIMEOUT_MS = 90_000
+
 export async function POST(request: Request) {
   const mock = () =>
     Response.json(mockUploadJob(), {
@@ -18,6 +21,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: contentType ? { "content-type": contentType } : undefined,
       body: await request.arrayBuffer(),
+      timeoutMs: UPLOAD_TIMEOUT_MS,
     },
     mock,
   )

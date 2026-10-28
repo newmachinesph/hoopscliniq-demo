@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 // The tracked "broadcast" court: a Play DNA play drawn at a frame the film clock chooses, instead of ClipboardPlay's
 // own loop. Parsed plays are cached per id; the floor markup is static, only the players and notation change.
 
-interface Parsed {
+export interface Parsed {
   clip: Clip
   notes: Note[]
   floor: string
@@ -59,7 +59,37 @@ export function TrackedCourt({
   label: string
   className?: string
 }) {
-  const { clip, notes, floor, lines } = parsedPlay(dna)
+  return <DnaCourt parsed={parsedPlay(dna)} src={src} label={label} className={className} />
+}
+
+/** Parse any play-dna document (a pipeline job's play.json) for DnaCourt; null when court.js rejects it. */
+export function parseDna(play: unknown): Parsed | null {
+  try {
+    const clip = H.parsePlay(play)
+    return {
+      clip,
+      notes: H.applyVerdicts(clip, { verdicts: [] }).notes,
+      floor: H.floorMarkup({ length: clip.length }),
+      lines: H.linesMarkup(clip.length),
+    }
+  } catch {
+    return null
+  }
+}
+
+/** TrackedCourt for a parsed job play: the same court drawn at source frame `src`, which the caller's clock sets. */
+export function DnaCourt({
+  parsed,
+  src,
+  label,
+  className,
+}: {
+  parsed: Parsed
+  src: number
+  label: string
+  className?: string
+}) {
+  const { clip, notes, floor, lines } = parsed
   const out = H.frame(clip, notes, Math.min(Math.max(src, 0), clip.frames - 1), {
     notation: true,
     history: true,
