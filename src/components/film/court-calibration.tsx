@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils"
 
 /** The backend re-projects and asks Muse Spark to rename the play: allow its 60 s plus the proxy's overhead. */
 const SAVE_TIMEOUT_MS = 65_000
+/** Keyboard crosshair step, as a share of the picture width (Shift: five times). */
+const KEY_STEP = 0.01
 /** On-screen marker sizes, in CSS pixels. */
 const MARK = { r: 9, font: 11, stroke: 2 }
 
@@ -73,8 +75,28 @@ export function CalibrationLayer({
   const px = (n: number) => n / scale
   const full = points.length === 4
 
-  // A click covers mouse, pen and touch taps alike (no scroll lock on phones). Listener, not onClick: the layer has no
-  // keyboard equivalent, the panel's buttons and keys are the accessible path.
+  // Keyboard path: when the layer has keyboard focus, a crosshair shows; arrow keys move it, Enter or Space marks it.
+  const [cursor, setCursor] = React.useState<Point | null>(null)
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!cursor || e.ctrlKey || e.metaKey || e.altKey) return
+    const step = iw * KEY_STEP * (e.shiftKey ? 5 : 1)
+    const move: Record<string, Point> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    }
+    const d = move[e.key]
+    if (d) {
+      e.preventDefault()
+      setCursor([Math.min(Math.max(cursor[0] + d[0], 0), iw), Math.min(Math.max(cursor[1] + d[1], 0), ih)])
+    } else if ((e.key === "Enter" || e.key === " ") && !full) {
+      e.preventDefault()
+      onTap([Math.round(cursor[0] * 10) / 10, Math.round(cursor[1] * 10) / 10])
+    }
+  }
+
+  // A click covers mouse, pen and touch taps alike (no scroll lock on phones).
   const tap = React.useRef({ onTap, blocked: full, size: [iw, ih] as [number, number] })
   React.useEffect(() => {
     tap.current = { onTap, blocked: full, size: [iw, ih] }
@@ -97,8 +119,20 @@ export function CalibrationLayer({
   return (
     <div
       ref={layerRef}
+      role="application"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: the keyboard crosshair needs focus; role="application" takes the arrow keys
+      tabIndex={0}
+      aria-label="Video frame. Tap the court corners, or use the arrow keys to move the crosshair and Enter to mark."
       data-testid="calibration-layer"
-      className={cn("absolute inset-0 touch-manipulation select-none", full ? "cursor-default" : "cursor-crosshair")}
+      onFocus={(e) => {
+        if (e.currentTarget.matches(":focus-visible")) setCursor((c) => c ?? [iw / 2, ih / 2])
+      }}
+      onBlur={() => setCursor(null)}
+      onKeyDown={onKeyDown}
+      className={cn(
+        "absolute inset-0 touch-manipulation select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        full ? "cursor-default" : "cursor-crosshair",
+      )}
     >
       <svg
         viewBox={`0 0 ${iw} ${ih}`}
@@ -115,6 +149,13 @@ export function CalibrationLayer({
             strokeWidth: px(MARK.stroke),
             strokeLinejoin: "round",
           })}
+        {cursor && !full && (
+          <g stroke="#ffffff" strokeWidth={px(1.5)}>
+            <line x1={cursor[0] - px(14)} y1={cursor[1]} x2={cursor[0] + px(14)} y2={cursor[1]} />
+            <line x1={cursor[0]} y1={cursor[1] - px(14)} x2={cursor[0]} y2={cursor[1] + px(14)} />
+            <circle cx={cursor[0]} cy={cursor[1]} r={px(6)} fill="none" stroke="var(--brand-orange)" />
+          </g>
+        )}
         {points.map(([x, y], i) => (
           <g key={i}>
             <circle cx={x} cy={y} r={px(MARK.r)} fill="var(--brand-navy)" stroke="#ffffff" strokeWidth={px(1.5)} />
@@ -231,8 +272,9 @@ export function CalibrationPanel({
   })
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const t = e.target as HTMLElement | null
-      if (t?.closest("input, textarea, select, [contenteditable='true']")) return
+      if (t?.isContentEditable || t?.closest("input, textarea, select, [role='textbox'], [role='dialog']")) return
       if (handlers.current.saving) return
       if (e.key === "Escape") {
         e.preventDefault()

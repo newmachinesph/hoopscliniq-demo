@@ -424,7 +424,7 @@ function DoneView({
               onSaved={(next) => {
                 leave()
                 onCalibrated(next)
-                toast("Court positions updated", { description: "Redrawn from the corners you marked." })
+                if (next) toast("Court positions updated", { description: "Redrawn from the corners you marked." })
               }}
             />
           )}
