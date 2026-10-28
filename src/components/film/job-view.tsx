@@ -48,6 +48,11 @@ const terminal = (job: FilmJob) => job.status === "done" || job.status === "fail
 function useJob(jobId: string, attempt: number): Poll {
   const [poll, setPoll] = React.useState<Poll>({ kind: "loading" })
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` marks a retry, which shows loading again
+  React.useEffect(() => {
+    setPoll((cur) => (cur.kind === "offline" ? { kind: "loading" } : cur))
+  }, [attempt])
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` restarts polling after "Try again"
   React.useEffect(() => {
     let alive = true
@@ -361,15 +366,17 @@ export function JobView({ jobId, sample }: { jobId: string; sample: SampleId | n
   const finished = job ? formatJobTime(job.finishedAt) : null
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" aria-live="polite">
-        {poll.kind === "loading" && <span>Checking the analysis…</span>}
-        {job?.status === "done" && (
-          <span className="flex items-center gap-1.5 text-foreground">
-            <SparkleIcon size={14} weight="fill" aria-hidden /> Analysis done
-          </span>
-        )}
-        {job?.status === "failed" && <span className="text-danger">Analysis stopped</span>}
-        {job && !terminal(job) && <span className="text-foreground">Analyzing your clip</span>}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <span aria-live="polite" className="flex items-center">
+          {poll.kind === "loading" && <span>Checking the analysis…</span>}
+          {job?.status === "done" && (
+            <span className="flex items-center gap-1.5 text-foreground">
+              <SparkleIcon size={14} weight="fill" aria-hidden /> Analysis done
+            </span>
+          )}
+          {job?.status === "failed" && <span className="text-danger">Analysis stopped</span>}
+          {job && !terminal(job) && <span className="text-foreground">Analyzing your clip</span>}
+        </span>
         {elapsed.started && (
           <span className="tabular-nums">
             {running ? "Elapsed" : "Took"} {mmss(elapsed.secs)}

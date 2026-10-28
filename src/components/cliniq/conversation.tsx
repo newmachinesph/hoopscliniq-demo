@@ -416,7 +416,11 @@ export function Conversation({
           )
         })
         .catch((err: unknown) => {
-          if (abort.signal.aborted) return
+          if (abort.signal.aborted) {
+            // Stopped or unmounted: drop the turn so it never stays pending.
+            setTurns((t) => t.filter((turn) => turn.id !== id))
+            return
+          }
           const error = err instanceof Error ? err.message : ASK_ERROR
           setTurns((t) => t.map((turn) => (turn.id === id ? { ...turn, phase: "done" as const, error } : turn)))
           setDraft((d) => d || q)
@@ -441,8 +445,15 @@ export function Conversation({
     }
   }, [initialPrompt, ask])
 
-  // Leaving the page cancels a pending question.
-  React.useEffect(() => () => controller.current?.abort(), [])
+  // Leaving the page cancels a pending question. Resetting `asked` lets a StrictMode remount ask again.
+  React.useEffect(
+    () => () => {
+      controller.current?.abort()
+      controller.current = null
+      asked.current = null
+    },
+    [],
+  )
 
   // Tell the parent about the latest finished answer.
   const onAnswerRef = React.useRef(onAnswer)

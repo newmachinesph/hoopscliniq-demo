@@ -7,11 +7,16 @@ type ProxyInit = {
   body?: BodyInit
   /** Per-route override; ClinIQ answers can take Muse Spark 30–60 s. */
   timeoutMs?: number
+  /** On a network error, timeout or 5xx: the mock (default), or a 502 JSON error with no x-demo header. */
+  fallback?: "mock" | "error"
+  /** When set, a 4xx from the backend returns this message as JSON instead of the backend's body. */
+  clientError?: string
 }
 
 // Server-only: HOOPSCLINIQ_API_URL has no NEXT_PUBLIC prefix, so it never reaches the browser bundle.
 // Unset: the mock, exactly as before. Set: forward to the backend and pass the status and JSON through.
-// A network error, timeout or 5xx falls back to the mock with an x-demo-fallback reason.
+// A network error, timeout or 5xx falls back to the mock with an x-demo-fallback reason (or a 502 JSON error
+// when the route sets `fallback: "error"`).
 export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response): Promise<Response> {
   const base = process.env.HOOPSCLINIQ_API_URL?.trim().replace(/\/+$/, "")
   if (!base) return mockResponse()
@@ -26,7 +31,13 @@ export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response)
       cache: "no-store",
       signal: controller.signal,
     })
-    if (upstream.status >= 500) return fallback(mockResponse, `upstream ${upstream.status}`)
+    if (upstream.status >= 500) return fallback(init, mockResponse, `upstream ${upstream.status}`)
+    if (init.clientError && upstream.status >= 400) {
+      return Response.json(
+        { error: init.clientError },
+        { status: upstream.status, headers: { "Cache-Control": "no-store" } },
+      )
+    }
     const text = await upstream.text()
     return new Response(text, {
       status: upstream.status,
@@ -38,13 +49,19 @@ export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response)
     })
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "AbortError"
-    return fallback(mockResponse, timedOut ? "timeout" : "network error")
+    return fallback(init, mockResponse, timedOut ? "timeout" : "network error")
   } finally {
     clearTimeout(timer)
   }
 }
 
-function fallback(mockResponse: () => Response, reason: string): Response {
+function fallback(init: ProxyInit, mockResponse: () => Response, reason: string): Response {
+  if (init.fallback === "error") {
+    return Response.json(
+      { error: "The analysis service is not answering. Try again in a moment." },
+      { status: 502, headers: { "Cache-Control": "no-store", "x-demo-fallback": reason } },
+    )
+  }
   const response = mockResponse()
   response.headers.set("x-demo", "mock")
   response.headers.set("x-demo-fallback", reason)

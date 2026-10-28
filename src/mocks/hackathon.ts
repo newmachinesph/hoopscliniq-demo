@@ -142,7 +142,7 @@ export const measuredResults: MeasuredResult[] = []
 
 // ---------- Mock API payloads (src/app/api/*). The backend replaces these. ----------
 
-const MOCK_JOB_ID = "demo-job-horns-twist"
+export const MOCK_JOB_ID = "demo-job-horns-twist"
 
 export function mockUploadJob() {
   return {

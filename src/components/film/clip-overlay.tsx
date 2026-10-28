@@ -11,7 +11,8 @@ const LABEL_FONT = "600 11px ui-sans-serif, system-ui, sans-serif"
 
 /** Clip frame index at video time t: frame = floor(t * fps), clamped to the clip. */
 export function frameAt(t: number, overlay: Pick<Overlay, "fps" | "frames">): number {
-  return Math.min(Math.max(Math.floor(t * overlay.fps), 0), Math.max(overlay.frames - 1, 0))
+  const f = Math.floor(t * overlay.fps)
+  return Math.min(Math.max(Number.isFinite(f) ? f : 0, 0), Math.max(overlay.frames - 1, 0))
 }
 
 function drawBoxes(canvas: HTMLCanvasElement, overlay: Overlay, frame: number) {

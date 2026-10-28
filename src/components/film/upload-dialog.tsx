@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils"
 
 const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"]
 const VIDEO_EXT = /\.(mp4|mov|webm)$/i
+const DURATION_TIMEOUT_MS = 5000
 const SEND_FAILED = "The upload did not go through. Try again."
 
 export interface NewUpload {
@@ -63,9 +64,14 @@ function readDuration(file: File): Promise<number> {
     video.preload = "metadata"
     video.muted = true
     const clean = () => {
+      clearTimeout(timer)
       URL.revokeObjectURL(url)
       video.removeAttribute("src")
     }
+    const timer = setTimeout(() => {
+      clean()
+      reject(new Error("timeout"))
+    }, DURATION_TIMEOUT_MS)
     video.onloadedmetadata = () => {
       const d = video.duration
       clean()
@@ -115,6 +121,9 @@ export function UploadDialog({
   const sampleClip = sampleClips.find((c) => c.id === sample) ?? null
   const fileReady = picked !== null && picked.duration !== null && picked.error === null
   const ready = (sampleClip !== null || fileReady) && (!needsConsent || consent !== "") && !sending
+
+  // Leaving the page cancels an upload in flight, so it cannot pull the user to a job page later.
+  React.useEffect(() => () => abortRef.current?.abort(), [])
 
   React.useEffect(() => {
     if (open) return
@@ -194,6 +203,7 @@ export function UploadDialog({
       } catch {
         // Private mode: the job page counts from when it opens instead.
       }
+      if (controller.signal.aborted) return
       router.push(`/film/jobs/${encodeURIComponent(data.jobId)}${sampleClip ? `?sample=${sampleClip.id}` : ""}`)
     } catch (error) {
       if (controller.signal.aborted) return
