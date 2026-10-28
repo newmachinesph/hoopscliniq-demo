@@ -13,11 +13,11 @@ export function DemoBar({ className }: { className?: string }) {
       )}
     >
       <p className="min-w-0 truncate">
-        <span className="sm:hidden">Sample team data, nothing is saved</span>
+        <span className="sm:hidden">Sample team, live Meta models</span>
         <span className="hidden sm:inline">
           <span className="hidden lg:inline">Meta Global AI Developer Hackathon 2026 · Hoops ClinIQ · </span>
           <span className="lg:hidden">Hackathon demo · </span>
-          sample team data, nothing is saved
+          sample team data, live Meta models
         </span>
       </p>
       <Link

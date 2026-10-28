@@ -61,7 +61,7 @@ const themeCards = [
   },
   {
     h: "Not possible before",
-    p: "Until now this took a pro camera rig or a paid tagging service. Promptable video segmentation and an open model we host ourselves bring it to film a coach already has, with kids' data kept in our own tenancy.",
+    p: "Until now this took a pro camera rig or a paid tagging service. Promptable video segmentation brings it to film a coach already has, and a player whose family says no is blurred out of every frame.",
   },
 ]
 
@@ -133,8 +133,8 @@ export default function HackathonPage() {
             </Link>
           </div>
           <p className="mt-4 max-w-2xl text-sm text-muted-foreground text-pretty">
-            Open demo, no sign-in. Everything you click is sample data for a fictional team, the Lakeshore Lions, and
-            nothing is saved.
+            Open demo, no sign-in. The team, the Lakeshore Lions, is fictional sample data. Clips you analyze run live
+            through SAM 3.1 and Muse Spark and are kept on the demo backend.
           </p>
         </div>
 
@@ -241,20 +241,20 @@ export default function HackathonPage() {
         <Section id="real" title="What's real and what's sample data">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-md border border-border bg-surface-1 p-4">
-              <h3 className="font-semibold">Today</h3>
+              <h3 className="font-semibold">Real</h3>
               <p className="mt-1.5 text-foreground-secondary text-pretty">
-                Everything in this demo is sample data. The team, players, games, clips, tags and every ClinIQ answer
-                are fictional and canned; a citation opens the clip, play or screen it cites when that screen is part of
-                this demo. No video is processed and nothing is saved. Record and upload say &ldquo;Preview&rdquo; and
-                store nothing.
+                The video pipeline, on real game footage. Modal pulls the frames, SAM 3.1 tracks the players and the
+                ball, Muse Spark names the play and writes the study quiz, and the consent blur comes from the SAM
+                tracks. ClinIQ answers through Muse Spark tool calls, with a citation for every claim.
               </p>
             </div>
             <div className="rounded-md border border-border bg-surface-1 p-4">
-              <h3 className="font-semibold">This build, {hackathon.buildWindow}</h3>
+              <h3 className="font-semibold">Sample data</h3>
               <p className="mt-1.5 text-foreground-secondary text-pretty">
-                The pipeline is being built now: Modal frames, SAM 3.1 tracking, Muse Spark naming and cited answers.
-                Each row above moves from &ldquo;Planned for this build&rdquo; to &ldquo;Live&rdquo; only when it runs
-                on real footage. Demo footage is adult or our own, never real minors&rsquo; data.
+                The team, its games, stats and playbook are fictional, so ClinIQ answers about a made-up season and
+                Muse Spark picks play names from a made-up playbook. The two sample clips are public CC BY 4.0
+                broadcasts of Hazen Union (Vermont) varsity games. Not in this build: Muse Spark Open on Baseten and
+                voice tags.
               </p>
             </div>
           </div>
@@ -362,7 +362,7 @@ export default function HackathonPage() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground sm:px-6">
-          <p>Sample team data. Fictional teams and players. Nothing is saved.</p>
+          <p>Sample team data: fictional teams and players. Game clips: HCTV, Hazen Union (VT), CC BY 4.0.</p>
           <div className="sm:hidden">
             <ThemeToggle />
           </div>

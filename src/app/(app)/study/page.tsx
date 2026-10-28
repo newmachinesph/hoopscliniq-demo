@@ -31,7 +31,7 @@ export default async function StudyPage({ searchParams }: PageProps<"/study">) {
       <PageHeader
         eyebrow={`Player view · what ${mePlayer.name} sees`}
         title={play ? `Study: ${play.title}` : "Study"}
-        description="The player studies the play you assigned, with his own role highlighted and the clips that show it, then takes a short quiz. Sample data; nothing is saved."
+        description="The player studies the play you assigned, with his own role highlighted and the clips that show it, then takes a short quiz. Sample team data; answers are not saved."
         actions={
           <>
             {play && (

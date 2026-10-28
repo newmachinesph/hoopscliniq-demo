@@ -59,7 +59,7 @@ export default function DemoPage() {
       <PageHeader
         eyebrow={`Hackathon demo · ${currentTeam.name}, sample team`}
         title="Demo flow"
-        description="Record a game, tag it, ask about it, and have players study it. Each step says what runs today and what this build adds. Sample data; nothing is saved."
+        description="Record a game, tag it, ask about it, and have players study it. Each step says what runs on Meta's models today. The team is sample data."
         actions={
           <Link href="/" className={cn(buttonVariants({ variant: "outline" }), "h-11 sm:h-8")}>
             About the submission
