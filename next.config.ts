@@ -1,6 +1,8 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  // Self-contained server for the Docker image (Northflank); Vercel ignores it.
+  output: "standalone",
   // The floating dev badge covers the account menu and the phone tab bar.
   devIndicators: false,
   // The submission landing page moved to /.
