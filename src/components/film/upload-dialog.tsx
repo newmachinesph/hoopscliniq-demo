@@ -116,9 +116,9 @@ export function UploadDialog({
 
   const pending = players.filter((p) => p.consent === "pending")
   const withConsent = players.length - pending.length
-  const needsConsent = kind !== "scout" && pending.length > 0
-  const held = consent === "hold" && needsConsent
   const sampleClip = sampleClips.find((c) => c.id === sample) ?? null
+  const needsConsent = kind !== "scout" && pending.length > 0 && sampleClip === null
+  const held = consent === "hold" && needsConsent
   const fileReady = picked !== null && picked.duration !== null && picked.error === null
   const ready = (sampleClip !== null || fileReady) && (!needsConsent || consent !== "") && !sending
 
@@ -169,7 +169,7 @@ export function UploadDialog({
 
   const submit = async () => {
     if (held) {
-      const name = sampleClip?.fileName ?? picked?.file.name ?? "clip"
+      const name = picked?.file.name ?? "clip"
       onUpload({ name, sizeMb: Math.round((picked?.file.size ?? 0) / 1024 ** 2), kind, held: true })
       onOpenChange(false)
       return
@@ -367,7 +367,12 @@ export function UploadDialog({
 
           <fieldset className={cn("rounded-md border p-3", needsConsent ? "border-warning/50" : "border-border")}>
             <legend className="px-1 text-xs font-semibold">Consent check</legend>
-            {kind === "scout" ? (
+            {sampleClip ? (
+              <p className="flex items-start gap-2 text-sm text-foreground-secondary">
+                <ShieldCheckIcon size={16} className="mt-0.5 shrink-0 text-success" aria-hidden />
+                Sample clip from another school: no players from your roster appear, so no consent choice is needed.
+              </p>
+            ) : kind === "scout" ? (
               <p className="flex items-start gap-2 text-sm text-foreground-secondary">
                 <ShieldCheckIcon size={16} className="mt-0.5 shrink-0 text-success" aria-hidden />
                 Scout film has no Lakeshore players. Opponents are incidental footage: labeled Opponent 1–5, never
