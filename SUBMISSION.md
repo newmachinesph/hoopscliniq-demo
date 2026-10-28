@@ -1,70 +1,90 @@
-# Hoops ClinIQ: Meta Global AI Developer Hackathon 2026 submission
+# Hoops ClinIQ: Meta Global AI Developer Hackathon 2026
 
 **Hoops ClinIQ turns a coach's phone video of a basketball game into tagged plays and answers that cite the exact clip.**
-- Demo: `/demo` in this app (run it locally, see below). The submission page is `/`.
-- Source: GitHub link added with the submission (placeholder).
-- Track: Indie developer. Team details are added with the submission.
 
-## Theme: Build for Your World
+- Live demo: https://web--demo--mnlqynqt4mjy.code.run (no sign-in). Start at `/demo`.
+- Code: this repo (the web app) and [hoopscliniq-ai](https://github.com/newmachinesph/hoopscliniq-ai) (the backend).
+- Track: Indie developer. Theme: Build for Your World.
 
-1. **A coach's problem.** Coaches film every game on a phone and almost never watch it back, because tagging one game by hand takes hours that a volunteer or high school coach doesn't have.
-2. **Meta's models, in that world.** SAM 3.1 follows the ten players through shaky phone footage, and Muse Spark names each play in the coach's own words and answers only when it can cite the clip.
-3. **Not possible before.** Until now this took a pro camera rig or a paid tagging service. Promptable video segmentation and an open model we host ourselves bring it to film a coach already has, with kids' data kept in our own tenancy.
+## The problem
 
-Why this theme: the "world" is a gym with one coach, one phone and no analyst. The models do the part that coach can't staff, and the coach still confirms every tag.
+High school and club coaches film every game on a phone and almost never watch it back. Tagging one game by hand takes
+hours, and a volunteer coach with no analyst doesn't have them. Pro teams pay for camera rigs and tagging services. A
+gym with one coach and one phone gets nothing.
 
-## The 90-second demo script
+## What it does with Meta's models
 
-Run the app (see "How to run it locally"), then follow these beats. The same list is on `/demo` under "Watch the 90-second path" (`demoScript` in `src/mocks/hackathon.ts`).
+1. **SAM 3.1 tracks the players.** The coach sends a 20-second clip. Modal re-encodes it to 12 fps, and SAM 3.1 tracks
+   every player with the prompt "basketball player" and the ball with a second prompt, "basketball". The backend
+   follows the camera as it pans, maps each player's feet onto the court, splits the two teams by jersey color, and
+   finds the ball holder, passes and shots.
+2. **Muse Spark 1.3 names the play.** It reads the coach's own playbook, a second-by-second summary of the tracks and
+   the passes and shots, and suggests which play this was and why. The coach confirms it; nothing is trusted until a
+   person says so.
+3. **Muse Spark writes the study quiz.** From the frames of a play, it writes questions for one player spot ("Where do
+   you go after the pass?"). The backend drops any question that points at a frame the play doesn't have. A player
+   answers and sees the frame that proves it. The quiz is a draft the coach checks before assigning.
+4. **ClinIQ answers with a source or not at all.** Muse Spark answers the coach's questions with tool calls
+   (`fetch_play`, `fetch_clip`, `fetch_stat`) over the team's season. Every claim carries a citation that opens the
+   clip or play behind it. With no source, ClinIQ says so instead of guessing.
+5. **SAM 3.1 hides a player without consent.** On a finished clip, the coach picks up to four players whose families
+   have not given consent. The backend blurs each one in every frame from that player's SAM track and from then on
+   serves only the blurred clip. The page says how many frames tracking missed, so the coach can check them.
 
-| Time      | Beat                | URL                                                                                      | What the viewer sees                                                                                     |
-| --------- | ------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 0:00–0:10 | The submission page | `/`                                                                                      | The one-liner and the theme: coaches film every game and almost never watch it back.                     |
-| 0:10–0:20 | Demo flow           | `/demo`                                                                                  | Four steps, Record, Tag, Ask and Study, each with what runs today and what this build adds.              |
-| 0:20–0:30 | Record              | `/film/record`                                                                           | The phone recorder: film from the stands and tap play names as they happen.                              |
-| 0:30–0:45 | Tag                 | `/film/cedar-park`                                                                       | A tagged game in the film room, with the pipeline strip: Modal frames, SAM 3.1 tracks, Muse Spark names. |
-| 0:45–0:55 | Review              | `/film/review`                                                                           | Suggested tags wait for the coach to confirm them; nothing is trusted until a person says so.            |
-| 0:55–1:15 | Ask                 | `/cliniq?q=What%20did%20we%20run%20against%20Westview's%20zone%20and%20what%20worked%3F` | ClinIQ answers the Westview zone question; each claim cites a clip, and one click opens that possession. |
-| 1:15–1:25 | Study               | `/study`                                                                                 | A player studies the assigned play with his role highlighted, then takes the quiz (`/study/quiz`).       |
-| 1:25–1:30 | Consent             | `/film?upload=1`                                                                         | On upload, the coach hides a player without guardian consent from player and parent views.               |
+## Measured
 
-## Meta models and where they are used
+Measured on Oct 28, 2026, on 5 live-play clips the pipeline was never tuned on (40 frames). A box counts when it
+overlaps a reference box at IoU 0.5 or more.
 
-Status today (Oct 28, 2026): every row is **planned, backend in progress Oct 28–Nov 3**. The backend is built in its own repo. The statuses shown in the app come from one file, `src/mocks/hackathon.ts` (`modelRows`, `pipelineSteps`); a row flips to "Live" only when it runs on real footage.
+| Measure                          | Result                |
+| -------------------------------- | --------------------- |
+| Player boxes: precision          | 83% (318 of 384)      |
+| Player boxes: recall             | 86% (318 of 369)      |
+| Camera motion followed           | 1,200 of 1,200 frames |
+| Upload to finished play, mean    | 109 s                 |
+| SAM 3.1 cost per 20-second clip  | $0.10                 |
+| Study quiz, Muse Spark call      | about 7 s             |
+| Hide a player, 20-second clip    | about 7 s             |
 
-| Model or tool                 | Where it runs               | What it does in Hoops ClinIQ                                                                                                                            | Status                                    |
-| ----------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| SAM 3.1                       | Meta API, called from Modal | Tracks all 10 players through a phone clip; jersey crops so the coach confirms who is who; consent mask to hide a player                                | Planned, backend in progress Oct 28–Nov 3 |
-| Muse Spark 1.3                | Meta API                    | Names the play in the coach's playbook words; drafts quiz questions; ClinIQ tool calls (`fetch_play`, `fetch_clip`, `fetch_stat`), no source, no answer | Planned, backend in progress Oct 28–Nov 3 |
-| Muse Spark Open               | Baseten                     | The coach-facing ClinIQ chat endpoint, so kids' data stays in our own tenancy                                                                           | Planned, backend in progress Oct 28–Nov 3 |
-| Modal pipeline                | Modal GPU jobs              | ffmpeg frames → SAM 3.1 tracks → play-dna JSON; the eval harness against hand-labelled clips                                                            | Planned, backend in progress Oct 28–Nov 3 |
-| Muse Code                     | Developer tool              | Builds the backend; its transcripts go in the writeup                                                                                                   | Planned, backend in progress Oct 28–Nov 3 |
-| Muse Voice Transcribe (bonus) | Meta API                    | Sideline voice tags: say the play name and the clip gets tagged                                                                                         | Planned, backend in progress Oct 28–Nov 3 |
-
-In the app: the model table and pipeline strip are on `/`; the pipeline strip is also on `/film` and every film room; each `/demo` card shows the status of the steps behind it.
+An AI vision model checked the reference boxes; a person has not checked them yet. Ball accuracy, passes, shots and
+screens are not measured. Full table: [eval/results/summary.md](https://github.com/newmachinesph/hoopscliniq-ai/blob/main/eval/results/summary.md).
 
 ## What's real and what's sample data
 
-- **Real today:** the frontend. Every screen in the core loop renders and works: the recorder UI, the film room with tags and deep links to a possession (`/film/<id>?t=<seconds>`), the review queue, the play editor, ClinIQ's cited answer to the demo question, player study and the quiz, and the "Hide this player" option on upload. The three API routes answer with the contract below.
-- **Sample data:** the team (the fictional Lakeshore Lions), players, games, clips, tags and every ClinIQ answer. The numbers in the demo answer are computed from the sample Westview film, but the film itself is fictional. Record and upload are previews: no video is processed and nothing is saved. Sources that point at screens outside this demo (scouting, roster, stats) show as plain labels.
-- **Planned for this build (Oct 28–Nov 3):** the Modal + SAM 3.1 pipeline, Muse Spark naming and cited answers, and the first measured accuracy results. "How we test" on `/` lists the pass lines; the results table stays empty until the eval runs. Demo footage is adult or our own, never real minors' data.
+- **Real:** the whole video pipeline on real game footage, SAM 3.1 tracking, Muse Spark naming, the quiz, the
+  consent blur and ClinIQ's tool calls. They all run on the Meta Model API from the backend on Modal.
+- **Sample data:** the team. The Lakeshore Lions, their games, stats and playbook are fictional, so ClinIQ's answers
+  are about a made-up season. The play names Muse Spark suggests for the real clips come from that fictional playbook.
+- **The clips:** two 20-second cuts from public broadcasts of Hazen Union (Vermont) varsity games, CC BY 4.0, by
+  Hardwick Community Television via Wikimedia Commons. Attribution is on screen wherever they play.
+- **Not in this build:** Muse Spark Open on Baseten (the backend has the switch, but the endpoint returned 403), voice
+  tags from Muse Voice Transcribe, made or missed shots, screens and cuts.
 
-## The API contract the backend fills
+## The 90-second video
 
-Three route handlers return mock data today, each with `x-demo: mock` and `Cache-Control: no-store`. The backend replaces their bodies and keeps the shapes.
+The video follows `demoScript` in `src/mocks/hackathon.ts`, also listed on `/demo` under "Watch the 90-second path".
 
-| Route                    | Request                                 | Response                                                                                            |
-| ------------------------ | --------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `POST /api/film/upload`  | the clip (multipart)                    | `202 { jobId, status: "queued", statusUrl }`: the Modal job id                                      |
-| `GET /api/film/jobs/:id` |                                         | `{ jobId, status, steps[], suggestedName, playDna }`; `400` on a bad id                             |
-| `POST /api/cliniq/ask`   | `{ "question": "..." }` (max 500 chars) | `{ question, answer: { body[], citations[], confidence, credits }, noSource }`; `400` on a bad body |
-1. `POST /api/film/upload` stores the clip, starts the Modal job (ffmpeg frames, SAM 3.1 tracks for the 10 players) and returns its job id.
-2. `GET /api/film/jobs/:id` returns the status of each pipeline step (Upload → Frames → Track → Name → Review → Cite), the player tracks as play-dna JSON (the `src/lib/play-dna/*.play.json` format: NFHS court, 84 × 50 ft, in feet) and Muse Spark's suggested play name for the coach to confirm.
-3. `POST /api/cliniq/ask` answers with Muse Spark using tool calls (`fetch_play`, `fetch_clip`, `fetch_stat`). Every claim carries a citation `{ kind: "play" | "clip" | "stat", label, href }` pointing at a route in this app. With no source, it says so instead of guessing.
+| Time      | Beat                | Where                                    | What the viewer sees                                                                                  |
+| --------- | ------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 0:00–0:08 | The submission page | `/`                                      | The one-liner and the measured results.                                                               |
+| 0:08–0:20 | Analyze a clip      | `/film?upload=1`                         | A 20-second game clip goes in; the steps advance through Modal, SAM 3.1 and Muse Spark.               |
+| 0:20–0:40 | The finished play   | `/film`, then the newest analysis        | SAM 3.1 boxes on the video, the ten players on the court diagram, Muse Spark's name for the play.     |
+| 0:40–0:50 | Hide a player       | the same analysis                        | The coach hides a player; the clip comes back blurred in every frame.                                 |
+| 0:50–1:08 | Quiz the team       | `/study/quiz?play=primary-transition`    | Muse Spark writes a quiz for one spot; a player answers and sees the frame that proves it.            |
+| 1:08–1:25 | Ask ClinIQ          | `/cliniq`                                | "What did we run against Westview's zone and what worked?", with a citation on every claim.           |
+| 1:25–1:30 | What's live         | `/demo`                                  | Each step shows what runs on Meta's models and what is still sample data.                             |
+
+## How it's built
+
+- **Web app** (this repo): Next.js 16 and React 19, deployed on Northflank. Its API routes are a thin proxy to the
+  backend. With no backend configured they answer from sample data, marked `x-demo: mock`.
+- **Backend** ([hoopscliniq-ai](https://github.com/newmachinesph/hoopscliniq-ai)): Python, FastAPI on Modal, the
+  Meta Model API through the OpenAI-compatible SDK, ffmpeg and OpenCV, storage on a Modal Volume, errors to Sentry.
+  173 tests. Its README documents every route, the pipeline step by step, and what doesn't work yet.
 
 ## How to run it locally
 
-Needs Node 22+ and pnpm. No environment variables, no sign-in.
+Needs Node 22+ and pnpm.
 
 ```bash
 pnpm install
@@ -72,4 +92,5 @@ pnpm build
 npx next start -p 3120
 ```
 
-Then open http://localhost:3120 (the submission page) and http://localhost:3120/demo (the demo). Every page is `noindex`.
+Open http://localhost:3120. With no environment variables, every screen runs on sample data. To use the live backend,
+set `HOOPSCLINIQ_API_URL` to its URL (see `.env.example`).
