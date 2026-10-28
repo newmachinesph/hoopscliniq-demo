@@ -9,6 +9,7 @@ export interface Clip {
   players: Record<string, "offense" | "defense">
   moments: { frame: number; label: string; i: number }[] // sorted by frame
   holder: (string | null)[]
+  ball: [number, number, number][] // [x, y, z] per frame; empty when the play has no ball track
   length: number // 47 (half court) or 94 (full court)
 }
 export interface Note {

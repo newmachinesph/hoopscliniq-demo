@@ -4,6 +4,7 @@ import {
   CheckCircleIcon,
   CircleNotchIcon,
   ClockIcon,
+  CrosshairIcon,
   InfoIcon,
   SparkleIcon,
   UserCheckIcon,
@@ -11,10 +12,12 @@ import {
 } from "@phosphor-icons/react"
 import Link from "next/link"
 import * as React from "react"
+import { toast } from "sonner"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Chip } from "@/components/ui/chip"
 import { pipelineSteps } from "@/data/hackathon"
+import type { Point } from "@/lib/calibration"
 import {
   type FilmJob,
   formatJobTime,
@@ -26,8 +29,10 @@ import {
 } from "@/lib/film-job"
 import { ClipboardPlay } from "@/lib/play-engine/clipboard-play"
 import { cn } from "@/lib/utils"
-import { ClipOverlay } from "./clip-overlay"
+import { ClipOverlay, frameAt } from "./clip-overlay"
+import { CalibrationLayer, CalibrationPanel } from "./court-calibration"
 import { DnaCourt, parseDna } from "./court-view"
+import { EventList } from "./event-list"
 import { SuggestedNameCard } from "./suggested-name-card"
 
 const POLL_MS = 2500
@@ -44,8 +49,11 @@ type Poll =
 
 const terminal = (job: FilmJob) => job.status === "done" || job.status === "failed"
 
-/** Polls GET /api/film/jobs/<id> every 2.5 s until the job is done or failed. */
-function useJob(jobId: string, attempt: number): Poll {
+/**
+ * Polls GET /api/film/jobs/<id> every 2.5 s until the job is done or failed. `replace` swaps in a job view the backend
+ * returned from another call (calibration), which is always live.
+ */
+function useJob(jobId: string, attempt: number): { poll: Poll; replace: (job: FilmJob) => void } {
   const [poll, setPoll] = React.useState<Poll>({ kind: "loading" })
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` marks a retry, which shows loading again
@@ -99,7 +107,8 @@ function useJob(jobId: string, attempt: number): Poll {
     }
   }, [jobId, attempt])
 
-  return poll
+  const replace = React.useCallback((job: FilmJob) => setPoll({ kind: "job", job, mock: false }), [])
+  return { poll, replace }
 }
 
 /** When the upload dialog sent this job (this tab only); null when the page was opened some other way. */
@@ -224,7 +233,9 @@ function playersFound(job: FilmJob): number | null {
 
 function HonestNotes({ job, mock, sample }: { job: FilmJob; mock: boolean; sample: SampleId | null }) {
   const found = playersFound(job)
-  const estimated = job.playDna?.meta?.calibration === "estimated"
+  const source = job.calibration?.source ?? job.playDna?.meta?.calibration
+  const motion = job.cameraMotion ?? job.playDna?.meta?.cameraMotion ?? null
+  const motionTotal = motion ? motion.framesTracked + motion.framesFallback : 0
   const hasVideo = Boolean(job.clipUrl && job.overlay)
   return (
     <Panel className="space-y-2 text-sm text-foreground-secondary">
@@ -247,7 +258,14 @@ function HonestNotes({ job, mock, sample }: { job: FilmJob; mock: boolean; sampl
           </p>
         )
       )}
-      {estimated && <p>Court positions use an estimated camera setup.</p>}
+      {source === "coach" && <p>Court positions use the corners you marked.</p>}
+      {source === "estimated" && <p>Court positions use an estimated camera setup.</p>}
+      {motion && motionTotal > 0 && (
+        <p>
+          Camera movement followed on <span className="tabular-nums">{motion.framesTracked}</span> of{" "}
+          <span className="tabular-nums">{motionTotal}</span> frames.
+        </p>
+      )}
       {!mock && (
         <p>Positions on the court are worked out from the boxes, not measured. Check them against the video.</p>
       )}
@@ -278,12 +296,13 @@ function CourtPanel({ job, frame, synced }: { job: FilmJob; frame: number; synce
       <figcaption className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-surface-1 px-3 py-2 text-xs text-muted-foreground">
         <span>Court diagram</span>
         <span>{synced ? "Follows the video" : "Loops on its own"}</span>
+        {parsed.clip.ball.length > 0 && <span>Ball filled in between sightings</span>}
       </figcaption>
     </figure>
   )
 }
 
-function TeamLegend() {
+function TeamLegend({ ball }: { ball: boolean }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="flex items-center gap-1">
@@ -292,18 +311,52 @@ function TeamLegend() {
       <span className="flex items-center gap-1">
         <span aria-hidden className="size-2.5 rounded-xs border-2 border-danger" /> Defense
       </span>
+      {ball && (
+        <span className="flex items-center gap-1">
+          <span aria-hidden className="size-2.5 rounded-full border border-white bg-[#ea7a2c]" /> Ball
+        </span>
+      )}
       <span>Boxes: SAM 3.1</span>
     </p>
   )
 }
 
-function DoneView({ job, mock, sample }: { job: FilmJob; mock: boolean; sample: SampleId | null }) {
+type Calibrating = { frame: number; points: Point[] }
+
+function DoneView({
+  job,
+  mock,
+  sample,
+  onCalibrated,
+}: {
+  job: FilmJob
+  mock: boolean
+  sample: SampleId | null
+  onCalibrated: (job: FilmJob | null) => void
+}) {
   const [frame, setFrame] = React.useState(0)
+  const [calib, setCalib] = React.useState<Calibrating | null>(null)
+  const videoRef = React.useRef<HTMLVideoElement>(null)
+  const fixRef = React.useRef<HTMLButtonElement>(null)
   const overlay = job.overlay
   const video = job.clipUrl && overlay ? { clipUrl: job.clipUrl, overlay } : null
+  // Calibration and events came with backend 0.3.0: an older job or the mock has neither field.
+  const canCalibrate = !mock && job.calibration !== undefined
+  const events = Array.isArray(overlay?.ball) ? (job.playDna?.events ?? []) : null
+
+  const leave = React.useCallback(() => {
+    setCalib(null)
+    requestAnimationFrame(() => fixRef.current?.focus())
+  }, [])
+
   const side = (
     <div className="space-y-4">
-      <SuggestedNameCard name={job.suggestedName ?? null} mock={mock} />
+      <SuggestedNameCard
+        key={job.suggestedName?.title ?? ""}
+        name={job.suggestedName ?? null}
+        mock={mock}
+        primary={!calib}
+      />
       <HonestNotes job={job} mock={mock} sample={sample} />
     </div>
   )
@@ -316,15 +369,69 @@ function DoneView({ job, mock, sample }: { job: FilmJob; mock: boolean; sample: 
       </div>
     )
 
+  const start = () => {
+    const el = videoRef.current
+    el?.pause()
+    setCalib({ frame: el ? frameAt(el.currentTime, video.overlay) : frame, points: [] })
+  }
+  const seek = (f: number) => {
+    const el = videoRef.current
+    if (!el) return
+    // The middle of the frame, so frameAt lands on it despite float rounding.
+    el.currentTime = (f + 0.5) / video.overlay.fps
+  }
+
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-2">
-        <figure className="space-y-2">
-          <ClipOverlay clipUrl={video.clipUrl} overlay={video.overlay} onFrame={setFrame} />
-          <figcaption>
-            <TeamLegend />
-          </figcaption>
-        </figure>
+        <div className="min-w-0 space-y-3">
+          <figure className="space-y-2">
+            <ClipOverlay
+              clipUrl={video.clipUrl}
+              overlay={video.overlay}
+              onFrame={setFrame}
+              videoRef={videoRef}
+              calibrating={calib !== null}
+            >
+              {calib && (
+                <CalibrationLayer
+                  videoRef={videoRef}
+                  imageSize={video.overlay.imageSize}
+                  points={calib.points}
+                  onTap={(p) => setCalib((c) => (c && c.points.length < 4 ? { ...c, points: [...c.points, p] } : c))}
+                />
+              )}
+            </ClipOverlay>
+            {!calib && (
+              <figcaption className="flex flex-wrap items-center justify-between gap-2">
+                <TeamLegend ball={Array.isArray(video.overlay.ball)} />
+                {canCalibrate && (
+                  <Button ref={fixRef} variant="outline" className="h-11 sm:h-8" onClick={start}>
+                    <CrosshairIcon aria-hidden /> Fix court position
+                  </Button>
+                )}
+              </figcaption>
+            )}
+          </figure>
+          {calib && (
+            <CalibrationPanel
+              jobId={job.jobId}
+              frame={calib.frame}
+              points={calib.points}
+              onUndo={() => setCalib((c) => (c ? { ...c, points: c.points.slice(0, -1) } : c))}
+              onReset={() => setCalib((c) => (c ? { ...c, points: [] } : c))}
+              onCancel={leave}
+              onSaved={(next) => {
+                leave()
+                onCalibrated(next)
+                toast("Court positions updated", { description: "Redrawn from the corners you marked." })
+              }}
+            />
+          )}
+          {events && (
+            <EventList events={events} fps={video.overlay.fps} frame={frame} onSeek={seek} disabled={calib !== null} />
+          )}
+        </div>
         <CourtPanel job={job} frame={frame} synced />
       </div>
       {side}
@@ -334,7 +441,7 @@ function DoneView({ job, mock, sample }: { job: FilmJob; mock: boolean; sample: 
 
 export function JobView({ jobId, sample }: { jobId: string; sample: SampleId | null }) {
   const [attempt, setAttempt] = React.useState(0)
-  const poll = useJob(jobId, attempt)
+  const { poll, replace } = useJob(jobId, attempt)
   const job = poll.kind === "job" ? poll.job : null
   // Elapsed counts from the first poll that found the job still running; a finished job shows when it finished.
   const running = job !== null && !terminal(job)
@@ -406,7 +513,15 @@ export function JobView({ jobId, sample }: { jobId: string; sample: SampleId | n
         </Panel>
       )}
 
-      {job?.status === "done" && <DoneView job={job} mock={poll.kind === "job" && poll.mock} sample={sample} />}
+      {job?.status === "done" && (
+        <DoneView
+          job={job}
+          mock={poll.kind === "job" && poll.mock}
+          sample={sample}
+          // The calibrate answer is the refreshed job; without one, poll again.
+          onCalibrated={(next) => (next ? replace(next) : setAttempt((n) => n + 1))}
+        />
+      )}
     </div>
   )
 }

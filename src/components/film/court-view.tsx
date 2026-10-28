@@ -62,10 +62,40 @@ export function TrackedCourt({
   return <DnaCourt parsed={parsedPlay(dna)} src={src} label={label} className={className} />
 }
 
+type BallPoint = [number, number, number]
+
+/**
+ * court.js wants a ball point on every frame (else it drops the ball); the pipeline sends null where SAM did not see
+ * it. Gaps are filled in a straight line between sightings and held before the first and after the last one.
+ * Empty when the ball was never seen.
+ */
+export function fillBallGaps(ball: readonly (BallPoint | null | undefined)[]): BallPoint[] {
+  const seen = ball.flatMap((p, i) => (p && Number.isFinite(p[0]) && Number.isFinite(p[1]) ? [i] : []))
+  if (!seen.length) return []
+  let k = 0
+  return ball.map((_, i) => {
+    while (k < seen.length - 1 && (seen[k + 1] as number) <= i) k++
+    const a = seen[k] as number
+    const pa = ball[a] as BallPoint
+    const b = seen[k + 1]
+    if (i <= a || b === undefined) return [pa[0], pa[1], pa[2] ?? 0]
+    const pb = ball[b] as BallPoint
+    const t = (i - a) / (b - a)
+    return [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t, 0]
+  })
+}
+
+/** A pipeline play with its ball gaps filled for court.js; other documents pass through unchanged. */
+function withFilledBall(play: unknown): unknown {
+  const tracks = (play as { tracks?: { ball?: unknown } } | null)?.tracks
+  if (!tracks || !Array.isArray(tracks.ball) || !tracks.ball.some((p) => p === null)) return play
+  return { ...(play as object), tracks: { ...tracks, ball: fillBallGaps(tracks.ball as (BallPoint | null)[]) } }
+}
+
 /** Parse any play-dna document (a pipeline job's play.json) for DnaCourt; null when court.js rejects it. */
 export function parseDna(play: unknown): Parsed | null {
   try {
-    const clip = H.parsePlay(play)
+    const clip = H.parsePlay(withFilledBall(play))
     return {
       clip,
       notes: H.applyVerdicts(clip, { verdicts: [] }).notes,

@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils"
 // Team colours: the same blue/red split as the court discs, from the status tokens so both themes stay readable.
 const TEAM_TOKEN = { offense: "--info", defense: "--danger" } as const
 const LABEL_FONT = "600 11px ui-sans-serif, system-ui, sans-serif"
+// The ball uses the court diagram's ball colours (hoops-court.js) so the two read as the same object.
+const BALL_FILL = "#ea7a2c"
+const BALL_RADIUS = { min: 4, max: 9 }
 
 /** Clip frame index at video time t: frame = floor(t * fps), clamped to the clip. */
 export function frameAt(t: number, overlay: Pick<Overlay, "fps" | "frames">): number {
@@ -63,24 +66,46 @@ function drawBoxes(canvas: HTMLCanvasElement, overlay: Overlay, frame: number) {
     ctx.fillStyle = ink
     ctx.fillText(id, x + 3, tagY + tagH / 2 + 0.5)
   }
+
+  // The ball: a small circle at the centre of its SAM box.
+  const ball = overlay.ball?.[frame]
+  if (ball) {
+    const [x1, y1, x2, y2] = ball
+    const r = Math.min(Math.max((Math.min(x2 - x1, y2 - y1) * scale) / 2, BALL_RADIUS.min), BALL_RADIUS.max)
+    ctx.beginPath()
+    ctx.arc(((x1 + x2) / 2) * scale, ((y1 + y2) / 2) * scale, r, 0, Math.PI * 2)
+    ctx.fillStyle = BALL_FILL
+    ctx.fill()
+    ctx.strokeStyle = ink
+    ctx.stroke()
+  }
 }
 
 /**
  * The pipeline's clip.mp4 with SAM 3.1 boxes drawn on a canvas for the frame on screen. Reports the frame index on every
- * change so the court diagram can follow the video.
+ * change so the court diagram can follow the video. While `calibrating`, the controls and boxes hide and `children`
+ * (the corner-tap layer) sits over the picture.
  */
 export function ClipOverlay({
   clipUrl,
   overlay,
   onFrame,
+  videoRef: outerRef,
+  calibrating = false,
   className,
+  children,
 }: {
   clipUrl: string
   overlay: Overlay
   onFrame?: (frame: number) => void
+  /** The caller's handle on the video element (to pause and seek it). */
+  videoRef?: React.RefObject<HTMLVideoElement | null>
+  calibrating?: boolean
   className?: string
+  children?: React.ReactNode
 }) {
-  const videoRef = React.useRef<HTMLVideoElement>(null)
+  const ownRef = React.useRef<HTMLVideoElement>(null)
+  const videoRef = outerRef ?? ownRef
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const onFrameRef = React.useRef(onFrame)
   React.useEffect(() => {
@@ -117,7 +142,7 @@ export function ClipOverlay({
       resize.disconnect()
       theme.disconnect()
     }
-  }, [overlay])
+  }, [overlay, videoRef])
 
   return (
     <div
@@ -127,14 +152,19 @@ export function ClipOverlay({
       <video
         ref={videoRef}
         src={clipUrl}
-        controls
+        controls={!calibrating}
         muted
         playsInline
         preload="auto"
         className="absolute inset-0 size-full object-contain"
         aria-label="Analyzed clip with player boxes"
       />
-      <canvas ref={canvasRef} aria-hidden className="pointer-events-none absolute inset-0 size-full" />
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className={cn("pointer-events-none absolute inset-0 size-full", calibrating && "invisible")}
+      />
+      {children}
     </div>
   )
 }

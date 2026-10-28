@@ -9,8 +9,8 @@ type ProxyInit = {
   timeoutMs?: number
   /** On a network error, timeout or 5xx: the mock (default), or a 502 JSON error with no x-demo header. */
   fallback?: "mock" | "error"
-  /** When set, a 4xx from the backend returns this message as JSON instead of the backend's body. */
-  clientError?: string
+  /** When set, a 4xx from the backend returns this message (or the message for its status) as JSON instead of its body. */
+  clientError?: string | ((status: number) => string)
 }
 
 // Server-only: HOOPSCLINIQ_API_URL has no NEXT_PUBLIC prefix, so it never reaches the browser bundle.
@@ -33,10 +33,8 @@ export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response)
     })
     if (upstream.status >= 500) return fallback(init, mockResponse, `upstream ${upstream.status}`)
     if (init.clientError && upstream.status >= 400) {
-      return Response.json(
-        { error: init.clientError },
-        { status: upstream.status, headers: { "Cache-Control": "no-store" } },
-      )
+      const error = typeof init.clientError === "function" ? init.clientError(upstream.status) : init.clientError
+      return Response.json({ error }, { status: upstream.status, headers: { "Cache-Control": "no-store" } })
     }
     const text = await upstream.text()
     return new Response(text, {

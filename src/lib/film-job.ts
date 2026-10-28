@@ -1,5 +1,5 @@
-// The film-analysis job contract shared by the mock and the backend (hoopscliniq-ai SPEC.md, v0.2.0).
-// Every field added in 0.2.0 is optional here: mock mode and an older backend must still render.
+// The film-analysis job contract shared by the mock and the backend (hoopscliniq-ai SPEC.md, v0.3.0).
+// Every field added in 0.2.0 and 0.3.0 is optional here: mock mode and an older backend must still render.
 
 export type JobStatus = "queued" | "frames" | "track" | "name" | "done" | "failed"
 export type JobStepStatus = "done" | "running" | "queued" | "failed" | "planned"
@@ -28,13 +28,54 @@ export interface Overlay {
   frames: number
   imageSize: [number, number]
   players: Record<string, { team: "offense" | "defense"; boxes: (Box | null)[] }>
+  /** 0.3.0: the SAM 3.1 "basketball" box per frame, null when unseen. */
+  ball?: (Box | null)[]
+}
+
+/** 0.3.0: a pass or shot found by the backend's rules on the ball track (never measured). */
+export interface FilmEvent {
+  type: "pass" | "shot" | string
+  from?: string
+  to?: string
+  frame: number
+  end?: number
+  made?: boolean | null
+  detect?: "heuristic" | string
+  confidence?: "low" | "medium" | "high" | string
+}
+
+/** 0.3.0: frames where the backend followed the camera, and frames that fell back to the calibration frame's view. */
+export interface CameraMotion {
+  framesTracked: number
+  framesFallback: number
+}
+
+/** A point in clip.mp4 pixels. */
+export type ClipPoint = [number, number]
+
+/** 0.3.0: the court corners the homography uses, estimated by the backend or marked by the coach. */
+export interface Calibration {
+  source: "estimated" | "coach" | string
+  frame: number
+  points: ClipPoint[]
 }
 
 /** The play-dna fields this app reads; court.js validates the rest. */
 export interface JobPlayDna {
   source?: { fps?: number; frames?: number }
-  tracks?: { players?: Record<string, [number, number][]> }
-  meta?: { playersFound?: number; calibration?: "given" | "estimated" | string }
+  tracks?: {
+    players?: Record<string, [number, number][]>
+    /** 0.3.0: [x, y, z] court feet per frame, null when unseen. */
+    ball?: ([number, number, number] | null)[]
+    /** 0.3.0: player id holding the ball per frame, or null. */
+    holder?: (string | null)[]
+  }
+  events?: FilmEvent[]
+  meta?: {
+    playersFound?: number
+    calibration?: "given" | "estimated" | "coach" | string
+    cameraMotion?: CameraMotion | null
+  }
 }
 
 export interface FilmJob {
@@ -47,6 +88,8 @@ export interface FilmJob {
   error?: string | null
   clipUrl?: string | null
   overlay?: Overlay | null
+  calibration?: Calibration | null
+  cameraMotion?: CameraMotion | null
 }
 
 export interface RecentJob {

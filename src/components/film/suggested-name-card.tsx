@@ -10,8 +10,19 @@ import type { SuggestedName } from "@/lib/film-job"
 
 const CONFIDENCE = { high: "High", medium: "Medium", low: "Low" } as const
 
-/** Muse Spark's suggested play name. Confirm and Rename stay in this page's state: nothing is saved anywhere. */
-export function SuggestedNameCard({ name, mock }: { name: SuggestedName | null; mock: boolean }) {
+/**
+ * Muse Spark's suggested play name. Confirm and Rename stay in this page's state: nothing is saved anywhere.
+ * `primary` false turns Confirm grey while another control on the page holds the one orange button.
+ */
+export function SuggestedNameCard({
+  name,
+  mock,
+  primary = true,
+}: {
+  name: SuggestedName | null
+  mock: boolean
+  primary?: boolean
+}) {
   const [title, setTitle] = React.useState(name?.title ?? "")
   const [confirmed, setConfirmed] = React.useState(false)
   const [renaming, setRenaming] = React.useState(false)
@@ -76,6 +87,7 @@ export function SuggestedNameCard({ name, mock }: { name: SuggestedName | null; 
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
+                variant={primary ? "default" : "secondary"}
                 className="h-11 sm:h-8"
                 disabled={confirmed}
                 onClick={() => {
