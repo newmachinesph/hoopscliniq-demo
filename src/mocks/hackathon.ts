@@ -285,7 +285,7 @@ export const demoFlow: DemoStep[] = [
     more: { href: "/study/results", label: "Team results" },
     strip: [
       { label: "Assigned play and quiz", status: "in-preview" },
-      { label: "Quiz questions · Muse Spark", status: "planned" },
+      { label: "Quiz questions · Muse Spark", status: "live" },
     ],
   },
 ]
@@ -294,12 +294,12 @@ export const consentStep: DemoStep = {
   id: "consent",
   title: "Hide this player",
   sentence:
-    "No data about a player is shown or used until a guardian agrees. On upload, the coach can hide a player without consent from player and parent views.",
-  href: "/film?upload=1",
-  cta: "See it on upload",
+    "No data about a player is shown or used until a guardian agrees. On a finished clip, the coach can blur a player without consent in every frame, from that player's SAM 3.1 track.",
+  href: "/film",
+  cta: "Open a finished clip",
   strip: [
     { label: "Hide from player and parent views", status: "in-preview" },
-    { label: "Consent mask · SAM 3.1", status: "planned" },
+    { label: "Consent mask · SAM 3.1", status: "live" },
   ],
 }
 

@@ -30,6 +30,7 @@ export function QuizFlow({
   const [score, setScore] = React.useState(0)
   const total = quiz.questions.length
   const q = quiz.questions[index]
+  const spot = quiz.spot ?? 2
 
   if (!q) {
     return (
@@ -103,9 +104,9 @@ export function QuizFlow({
             play={play}
             frame={shownFrame}
             showDefense
-            selected={1}
+            selected={spot - 1}
             className="block w-full"
-            title={`${play.title}, frame ${shownFrame + 1}. You are number 2.`}
+            title={`${play.title}, frame ${shownFrame + 1}. You are number ${spot}.`}
           />
         </div>
       )}

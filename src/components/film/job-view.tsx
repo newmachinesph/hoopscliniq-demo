@@ -5,6 +5,7 @@ import {
   CircleNotchIcon,
   ClockIcon,
   CrosshairIcon,
+  EyeSlashIcon,
   InfoIcon,
   SparkleIcon,
   UserCheckIcon,
@@ -21,6 +22,7 @@ import type { Landmarks, Point } from "@/lib/calibration"
 import {
   type FilmJob,
   formatJobTime,
+  type HiddenInfo,
   type JobStep,
   jobStartKey,
   SAMPLE_ATTRIBUTION,
@@ -33,6 +35,7 @@ import { ClipOverlay, frameAt } from "./clip-overlay"
 import { CalibrationLayer, CalibrationPanel } from "./court-calibration"
 import { DnaCourt, parseDna } from "./court-view"
 import { EventList } from "./event-list"
+import { HidePlayersDialog } from "./hide-players-dialog"
 import { SuggestedNameCard } from "./suggested-name-card"
 
 const POLL_MS = 2500
@@ -329,25 +332,51 @@ function TeamLegend({ ball }: { ball: boolean }) {
 
 type Calibrating = { frame: number; points: Point[]; landmarks: Landmarks }
 
+/** Under the video: who is hidden, and how many frames the blur could not cover. */
+function HiddenNote({ hidden }: { hidden: HiddenInfo }) {
+  const missed = Math.max(0, ...Object.values(hidden.framesMissed))
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-muted-foreground text-pretty">
+      <EyeSlashIcon size={14} className="mt-px shrink-0" aria-hidden />
+      <span>
+        Hidden: {hidden.playerIds.join(", ")}.
+        {missed > 0 && (
+          <>
+            {" "}
+            Not covered on <span className="tabular-nums">{missed}</span> of{" "}
+            <span className="tabular-nums">{hidden.frames}</span> frames.
+          </>
+        )}
+      </span>
+    </p>
+  )
+}
+
 function DoneView({
   job,
   mock,
   sample,
   onCalibrated,
+  onHidden,
 }: {
   job: FilmJob
   mock: boolean
   sample: SampleId | null
   onCalibrated: (job: FilmJob | null) => void
+  onHidden: (job: FilmJob | null) => void
 }) {
   const [frame, setFrame] = React.useState(0)
   const [calib, setCalib] = React.useState<Calibrating | null>(null)
+  const [hideOpen, setHideOpen] = React.useState(false)
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const fixRef = React.useRef<HTMLButtonElement>(null)
   const overlay = job.overlay
   const video = job.clipUrl && overlay ? { clipUrl: job.clipUrl, overlay } : null
   // Calibration and events came with backend 0.3.0: an older job or the mock has neither field.
   const canCalibrate = !mock && job.calibration !== undefined
+  // Hiding came with backend 0.4.0, which always sends `hidden` (null when everyone is shown).
+  const canHide = !mock && job.hidden !== undefined
+  const hiddenIds = job.hidden?.playerIds ?? []
   const events = Array.isArray(overlay?.ball) ? (job.playDna?.events ?? []) : null
 
   const leave = React.useCallback(() => {
@@ -398,6 +427,7 @@ function DoneView({
               onFrame={setFrame}
               videoRef={videoRef}
               calibrating={calib !== null}
+              hiddenIds={hiddenIds}
             >
               {calib && (
                 <CalibrationLayer
@@ -412,14 +442,34 @@ function DoneView({
             {!calib && (
               <figcaption className="flex flex-wrap items-center justify-between gap-2">
                 <TeamLegend ball={Array.isArray(video.overlay.ball)} />
-                {canCalibrate && (
-                  <Button ref={fixRef} variant="outline" className="h-11 sm:h-8" onClick={start}>
-                    <CrosshairIcon aria-hidden /> Fix court position
-                  </Button>
+                {(canCalibrate || canHide) && (
+                  <div className="flex flex-wrap gap-2">
+                    {canCalibrate && (
+                      <Button ref={fixRef} variant="outline" className="h-11 sm:h-8" onClick={start}>
+                        <CrosshairIcon aria-hidden /> Fix court position
+                      </Button>
+                    )}
+                    {canHide && (
+                      <Button variant="outline" className="h-11 sm:h-8" onClick={() => setHideOpen(true)}>
+                        <EyeSlashIcon aria-hidden /> Hide a player
+                      </Button>
+                    )}
+                  </div>
                 )}
               </figcaption>
             )}
+            {job.hidden && hiddenIds.length > 0 && <HiddenNote hidden={job.hidden} />}
           </figure>
+          {canHide && (
+            <HidePlayersDialog
+              jobId={job.jobId}
+              overlay={video.overlay}
+              hiddenIds={hiddenIds}
+              open={hideOpen}
+              onOpenChange={setHideOpen}
+              onSaved={onHidden}
+            />
+          )}
           {calib && (
             <CalibrationPanel
               jobId={job.jobId}
@@ -529,6 +579,8 @@ export function JobView({ jobId, sample }: { jobId: string; sample: SampleId | n
           sample={sample}
           // The calibrate answer is the refreshed job; without one, poll again.
           onCalibrated={(next) => (next ? replace(next) : setAttempt((n) => n + 1))}
+          // Hiding answers the same way: the refreshed job, with the new clipUrl.
+          onHidden={(next) => (next ? replace(next) : setAttempt((n) => n + 1))}
         />
       )}
     </div>

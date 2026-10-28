@@ -1,5 +1,5 @@
-// The film-analysis job contract shared by the mock and the backend (hoopscliniq-ai SPEC.md, v0.3.0).
-// Every field added in 0.2.0 and 0.3.0 is optional here: mock mode and an older backend must still render.
+// The film-analysis job contract shared by the mock and the backend (hoopscliniq-ai SPEC.md, v0.4.0).
+// Every field added in 0.2.0 to 0.4.0 is optional here: mock mode and an older backend must still render.
 
 export type JobStatus = "queued" | "frames" | "track" | "name" | "done" | "failed"
 export type JobStepStatus = "done" | "running" | "queued" | "failed" | "planned"
@@ -80,6 +80,15 @@ export interface JobPlayDna {
   }
 }
 
+/** 0.4.0: players hidden in the clip for consent, and how many frames the render could not cover. */
+export interface HiddenInfo {
+  playerIds: string[]
+  /** Frames per hidden player with no box within the hold window. */
+  framesMissed: Record<string, number>
+  frames: number
+  at: string
+}
+
 export interface FilmJob {
   jobId: string
   status: JobStatus
@@ -92,6 +101,8 @@ export interface FilmJob {
   overlay?: Overlay | null
   calibration?: Calibration | null
   cameraMotion?: CameraMotion | null
+  /** 0.4.0: null when everyone is shown; missing on an older backend and in the mock. */
+  hidden?: HiddenInfo | null
 }
 
 export interface RecentJob {

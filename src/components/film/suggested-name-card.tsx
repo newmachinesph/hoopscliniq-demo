@@ -1,12 +1,15 @@
 "use client"
 
 import { CheckCircleIcon, CheckIcon, PencilSimpleIcon, SparkleIcon } from "@phosphor-icons/react"
+import Link from "next/link"
 import * as React from "react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Chip } from "@/components/ui/chip"
+import { getPlay } from "@/data/plays"
 import type { SuggestedName } from "@/lib/film-job"
+import { cn } from "@/lib/utils"
 
 const CONFIDENCE = { high: "High", medium: "Medium", low: "Low" } as const
 
@@ -27,6 +30,9 @@ export function SuggestedNameCard({
   const [confirmed, setConfirmed] = React.useState(false)
   const [renaming, setRenaming] = React.useState(false)
   const [draft, setDraft] = React.useState("")
+
+  // Muse Spark can name a play that is not in the playbook; only a playbook play has frames to write a quiz from.
+  const quizPlay = name ? getPlay(name.playId) : undefined
 
   const saved = (description: string) => toast("Saved in this preview", { description })
 
@@ -108,6 +114,14 @@ export function SuggestedNameCard({
                 <PencilSimpleIcon aria-hidden /> Rename
               </Button>
             </div>
+          )}
+          {quizPlay && (
+            <Link
+              href={`/study/quiz?play=${encodeURIComponent(quizPlay.id)}`}
+              className={cn(buttonVariants({ variant: "ghost" }), "mt-2 -ml-2.5 h-11 sm:h-8")}
+            >
+              <SparkleIcon weight="fill" aria-hidden /> Quiz the team on {quizPlay.title}
+            </Link>
           )}
         </>
       )}

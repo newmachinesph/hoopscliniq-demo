@@ -11,6 +11,9 @@ type ProxyInit = {
   fallback?: "mock" | "error"
   /** When set, a 4xx from the backend returns this message (or the message for its status) as JSON instead of its body. */
   clientError?: string | ((status: number) => string)
+  /** A 5xx whose JSON body carries `{ error }` returns that message with its status (the backend's own friendly
+   * reason) instead of the fallback. Other 5xx bodies still fall back. */
+  passServerErrors?: boolean
 }
 
 // Server-only: HOOPSCLINIQ_API_URL has no NEXT_PUBLIC prefix, so it never reaches the browser bundle.
@@ -31,7 +34,11 @@ export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response)
       cache: "no-store",
       signal: controller.signal,
     })
-    if (upstream.status >= 500) return fallback(init, mockResponse, `upstream ${upstream.status}`)
+    if (upstream.status >= 500) {
+      const error = init.passServerErrors ? await upstreamError(upstream) : null
+      if (error) return Response.json({ error }, { status: upstream.status, headers: { "Cache-Control": "no-store" } })
+      return fallback(init, mockResponse, `upstream ${upstream.status}`)
+    }
     if (init.clientError && upstream.status >= 400) {
       const error = typeof init.clientError === "function" ? init.clientError(upstream.status) : init.clientError
       return Response.json({ error }, { status: upstream.status, headers: { "Cache-Control": "no-store" } })
@@ -51,6 +58,11 @@ export async function proxyOrMock(init: ProxyInit, mockResponse: () => Response)
   } finally {
     clearTimeout(timer)
   }
+}
+
+async function upstreamError(res: Response): Promise<string | null> {
+  const body = (await res.json().catch(() => null)) as { error?: unknown } | null
+  return typeof body?.error === "string" && body.error.length <= 200 ? body.error : null
 }
 
 function fallback(init: ProxyInit, mockResponse: () => Response, reason: string): Response {

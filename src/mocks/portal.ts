@@ -77,6 +77,8 @@ export interface Quiz {
   title: string
   topic: string
   due: ISODate | null
+  /** The player spot (1-5) the questions are written for; missing means spot 2. Set on quizzes written by ClinIQ. */
+  spot?: number
   questions: QuizQuestion[]
 }
 

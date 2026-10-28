@@ -18,7 +18,7 @@ export function frameAt(t: number, overlay: Pick<Overlay, "fps" | "frames">): nu
   return Math.min(Math.max(Number.isFinite(f) ? f : 0, 0), Math.max(overlay.frames - 1, 0))
 }
 
-function drawBoxes(canvas: HTMLCanvasElement, overlay: Overlay, frame: number) {
+function drawBoxes(canvas: HTMLCanvasElement, overlay: Overlay, frame: number, skip: ReadonlySet<string>) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   const dpr = window.devicePixelRatio || 1
@@ -46,6 +46,7 @@ function drawBoxes(canvas: HTMLCanvasElement, overlay: Overlay, frame: number) {
   ctx.lineWidth = 2
 
   for (const [id, player] of Object.entries(overlay.players)) {
+    if (skip.has(id)) continue
     const box = player.boxes[frame]
     if (!box) continue
     const [x1, y1, x2, y2] = box
@@ -84,7 +85,7 @@ function drawBoxes(canvas: HTMLCanvasElement, overlay: Overlay, frame: number) {
 /**
  * The pipeline's clip.mp4 with SAM 3.1 boxes drawn on a canvas for the frame on screen. Reports the frame index on every
  * change so the court diagram can follow the video. While `calibrating`, the controls and boxes hide and `children`
- * (the corner-tap layer) sits over the picture.
+ * (the corner-tap layer) sits over the picture. `hiddenIds` are players hidden in the clip for consent: no box for them.
  */
 export function ClipOverlay({
   clipUrl,
@@ -92,6 +93,7 @@ export function ClipOverlay({
   onFrame,
   videoRef: outerRef,
   calibrating = false,
+  hiddenIds,
   className,
   children,
 }: {
@@ -101,6 +103,7 @@ export function ClipOverlay({
   /** The caller's handle on the video element (to pause and seek it). */
   videoRef?: React.RefObject<HTMLVideoElement | null>
   calibrating?: boolean
+  hiddenIds?: string[]
   className?: string
   children?: React.ReactNode
 }) {
@@ -112,18 +115,20 @@ export function ClipOverlay({
     onFrameRef.current = onFrame
   }, [onFrame])
   const [w, h] = overlay.imageSize
+  const hiddenKey = (hiddenIds ?? []).join(",")
 
   React.useEffect(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
+    const skip = new Set(hiddenKey ? hiddenKey.split(",") : [])
     let last = -1
     let raf = 0
     const tick = () => {
       const f = frameAt(video.currentTime, overlay)
       if (f !== last) {
         last = f
-        drawBoxes(canvas, overlay, f)
+        drawBoxes(canvas, overlay, f, skip)
         onFrameRef.current?.(f)
       }
       raf = requestAnimationFrame(tick)
@@ -142,7 +147,7 @@ export function ClipOverlay({
       resize.disconnect()
       theme.disconnect()
     }
-  }, [overlay, videoRef])
+  }, [overlay, videoRef, hiddenKey])
 
   return (
     <div
@@ -157,7 +162,7 @@ export function ClipOverlay({
         playsInline
         preload="auto"
         className="absolute inset-0 size-full object-contain"
-        aria-label="Analyzed clip with player boxes"
+        aria-label={hiddenKey ? "Analyzed clip with selected players hidden" : "Analyzed clip with player boxes"}
       />
       <canvas
         ref={canvasRef}

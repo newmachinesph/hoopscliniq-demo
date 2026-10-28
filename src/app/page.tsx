@@ -262,8 +262,8 @@ export default function HackathonPage() {
 
         <Section id="testing" title="How we test">
           <p className="max-w-2xl text-foreground-secondary text-pretty">
-            Tracks and tags are scored against checked reference clips. These are the pass lines we hold ourselves to before
-            we sell film tagging:
+            Tracks and tags are scored against checked reference clips. These are the pass lines we hold ourselves to
+            before we sell film tagging:
           </p>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
             {passLines.map((p) => (

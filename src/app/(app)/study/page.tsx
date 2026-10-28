@@ -1,4 +1,4 @@
-import { UsersThreeIcon } from "@phosphor-icons/react/ssr"
+import { SparkleIcon, UsersThreeIcon } from "@phosphor-icons/react/ssr"
 import type { Metadata } from "next"
 import Link from "next/link"
 
@@ -33,9 +33,19 @@ export default async function StudyPage({ searchParams }: PageProps<"/study">) {
         title={play ? `Study: ${play.title}` : "Study"}
         description="The player studies the play you assigned, with his own role highlighted and the clips that show it, then takes a short quiz. Sample data; nothing is saved."
         actions={
-          <Link href="/study/results" className={cn(buttonVariants({ variant: "outline" }), "h-11 sm:h-8")}>
-            <UsersThreeIcon aria-hidden /> Team results
-          </Link>
+          <>
+            {play && (
+              <Link
+                href={`/study/quiz?play=${encodeURIComponent(play.id)}`}
+                className={cn(buttonVariants({ variant: "outline" }), "h-11 sm:h-8")}
+              >
+                <SparkleIcon weight="fill" aria-hidden /> Write a quiz with ClinIQ
+              </Link>
+            )}
+            <Link href="/study/results" className={cn(buttonVariants({ variant: "outline" }), "h-11 sm:h-8")}>
+              <UsersThreeIcon aria-hidden /> Team results
+            </Link>
+          </>
         }
       />
       {play && assignment ? (
