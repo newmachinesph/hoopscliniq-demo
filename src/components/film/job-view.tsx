@@ -17,7 +17,7 @@ import { toast } from "sonner"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Chip } from "@/components/ui/chip"
 import { pipelineSteps } from "@/data/hackathon"
-import type { Point } from "@/lib/calibration"
+import type { Landmarks, Point } from "@/lib/calibration"
 import {
   type FilmJob,
   formatJobTime,
@@ -258,7 +258,13 @@ function HonestNotes({ job, mock, sample }: { job: FilmJob; mock: boolean; sampl
           </p>
         )
       )}
-      {source === "coach" && <p>Court positions use the corners you marked.</p>}
+      {source === "coach" && (
+        <p>
+          {job.calibration?.landmarks === "lane"
+            ? "Court positions use the lane corners you marked."
+            : "Court positions use the corners you marked."}
+        </p>
+      )}
       {source === "estimated" && <p>Court positions use an estimated camera setup.</p>}
       {motion && motionTotal > 0 && (
         <p>
@@ -321,7 +327,7 @@ function TeamLegend({ ball }: { ball: boolean }) {
   )
 }
 
-type Calibrating = { frame: number; points: Point[] }
+type Calibrating = { frame: number; points: Point[]; landmarks: Landmarks }
 
 function DoneView({
   job,
@@ -372,7 +378,7 @@ function DoneView({
   const start = () => {
     const el = videoRef.current
     el?.pause()
-    setCalib({ frame: el ? frameAt(el.currentTime, video.overlay) : frame, points: [] })
+    setCalib({ frame: el ? frameAt(el.currentTime, video.overlay) : frame, points: [], landmarks: "lane" })
   }
   const seek = (f: number) => {
     const el = videoRef.current
@@ -398,6 +404,7 @@ function DoneView({
                   videoRef={videoRef}
                   imageSize={video.overlay.imageSize}
                   points={calib.points}
+                  current={job.calibration?.frame === calib.frame ? job.calibration.points : null}
                   onTap={(p) => setCalib((c) => (c && c.points.length < 4 ? { ...c, points: [...c.points, p] } : c))}
                 />
               )}
@@ -418,13 +425,15 @@ function DoneView({
               jobId={job.jobId}
               frame={calib.frame}
               points={calib.points}
+              landmarks={calib.landmarks}
+              onLandmarks={(landmarks) => setCalib((c) => (c ? { ...c, landmarks, points: [] } : c))}
               onUndo={() => setCalib((c) => (c ? { ...c, points: c.points.slice(0, -1) } : c))}
               onReset={() => setCalib((c) => (c ? { ...c, points: [] } : c))}
               onCancel={leave}
               onSaved={(next) => {
                 leave()
                 onCalibrated(next)
-                if (next) toast("Court positions updated", { description: "Redrawn from the corners you marked." })
+                if (next) toast("Court positions updated", { description: "Redrawn from the points you marked." })
               }}
             />
           )}

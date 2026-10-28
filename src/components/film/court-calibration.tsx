@@ -1,10 +1,22 @@
-// Client-only (imported from the client JobView). Calibration mode: the coach taps the four corners of the attacked half
-// on the paused video; Save posts them with the frame and the backend redraws the court from them.
+// Client-only (imported from the client JobView). Calibration mode: the coach picks a landmark set (the painted lane's
+// corners, recommended, or the attacked half's corners) and taps its four points on the paused video; Save posts them
+// with the frame and the set, and the backend redraws the court from them.
 import { ArrowCounterClockwiseIcon, CircleNotchIcon } from "@phosphor-icons/react"
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
-import { aspectFor, CORNERS, clientToClip, isConvexQuad, type ObjectFit, type Point } from "@/lib/calibration"
+import { Segmented } from "@/components/ui/segmented"
+import {
+  aspectFor,
+  clientToClip,
+  insideFrame,
+  isConvexQuad,
+  LANDMARK_ORDER,
+  LANDMARK_SETS,
+  type Landmarks,
+  type ObjectFit,
+  type Point,
+} from "@/lib/calibration"
 import type { FilmJob } from "@/lib/film-job"
 import { cn } from "@/lib/utils"
 
@@ -15,7 +27,7 @@ const KEY_STEP = 0.01
 /** On-screen marker sizes, in CSS pixels. */
 const MARK = { r: 9, font: 11, stroke: 2 }
 
-const SAVE_FAILED = "The corners could not be saved. Check your connection and try again."
+const SAVE_FAILED = "The points could not be saved. Check your connection and try again."
 
 /** The video's own size (videoWidth x videoHeight), falling back to the overlay's imageSize before metadata loads. */
 function useIntrinsic(videoRef: React.RefObject<HTMLVideoElement | null>, fallback: [number, number]) {
@@ -54,16 +66,21 @@ const fitOf = (video: HTMLVideoElement | null): ObjectFit =>
 /**
  * The tap surface over the video. A tap (mouse or touch) maps from the displayed picture to clip.mp4 pixels, letterbox
  * bars excluded; the marks and the outline are drawn in clip pixels through an SVG that fits the same way as the video.
+ * `current` is the calibration in use, drawn faintly for reference when it was set on this frame. Its points can lie
+ * off the picture (the estimate extrapolates an off-screen corner): the outline is clipped to the picture and those
+ * points get no marker.
  */
 export function CalibrationLayer({
   videoRef,
   imageSize,
   points,
+  current,
   onTap,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>
   imageSize: [number, number]
   points: Point[]
+  current?: Point[] | null
   onTap: (p: Point) => void
 }) {
   const layerRef = React.useRef<HTMLDivElement>(null)
@@ -74,6 +91,7 @@ export function CalibrationLayer({
   const scale = width && height ? Math.min(width / iw, height / ih) : 1
   const px = (n: number) => n / scale
   const full = points.length === 4
+  const clipId = `calibration-frame-${React.useId().replace(/:/g, "")}`
 
   // Keyboard path: when the layer has keyboard focus, a crosshair shows; arrow keys move it, Enter or Space marks it.
   const [cursor, setCursor] = React.useState<Point | null>(null)
@@ -122,7 +140,7 @@ export function CalibrationLayer({
       role="application"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the keyboard crosshair needs focus; role="application" takes the arrow keys
       tabIndex={0}
-      aria-label="Video frame. Tap the court corners, or use the arrow keys to move the crosshair and Enter to mark."
+      aria-label="Video frame. Tap the court points, or use the arrow keys to move the crosshair and Enter to mark."
       data-testid="calibration-layer"
       onFocus={(e) => {
         if (e.currentTarget.matches(":focus-visible")) setCursor((c) => c ?? [iw / 2, ih / 2])
@@ -140,6 +158,29 @@ export function CalibrationLayer({
         className="pointer-events-none absolute inset-0 size-full"
         aria-hidden
       >
+        <defs>
+          <clipPath id={clipId}>
+            <rect x={0} y={0} width={iw} height={ih} />
+          </clipPath>
+        </defs>
+        {current?.length === 4 && (
+          <g clipPath={`url(#${clipId})`} data-testid="current-calibration">
+            <polygon
+              points={current.map((p) => p.join(",")).join(" ")}
+              fill="none"
+              stroke="#ffffff"
+              strokeOpacity={0.7}
+              strokeWidth={px(1.5)}
+              strokeDasharray={`${px(6)} ${px(5)}`}
+              strokeLinejoin="round"
+            />
+            {current
+              .filter((p) => insideFrame(p, [iw, ih]))
+              .map(([x, y]) => (
+                <circle key={`${x},${y}`} cx={x} cy={y} r={px(3)} fill="#ffffff" fillOpacity={0.8} />
+              ))}
+          </g>
+        )}
         {points.length > 1 &&
           React.createElement(full ? "polygon" : "polyline", {
             points: points.map((p) => p.join(",")).join(" "),
@@ -177,36 +218,58 @@ export function CalibrationLayer({
   )
 }
 
-/**
- * A small top-down sketch of the attacked half as the camera sees it (baseline far, half-court line near) with the
- * four corners numbered in tap order. Marked corners are filled; the next one is ringed in orange.
- */
-function CourtSketch({ next }: { next: number }) {
-  const corners: Point[] = [
+/** Sketch corners of the attacked half (baseline far, half-court line near) and of the painted lane, in tap order. */
+const SKETCH: Record<Landmarks, Point[]> = {
+  half: [
     [22, 10],
     [86, 10],
     [102, 66],
     [6, 66],
-  ]
+  ],
+  lane: [
+    [46, 10],
+    [62, 10],
+    [64, 32],
+    [44, 32],
+  ],
+}
+
+/**
+ * A small top-down sketch of the attacked half as the camera sees it (baseline far, half-court line near) with the
+ * four points of the chosen set numbered in tap order. Marked points are filled; the next one is ringed in orange.
+ */
+function CourtSketch({ next, landmarks }: { next: number; landmarks: Landmarks }) {
+  const lane = landmarks === "lane"
+  // The lane corners sit close together: smaller markers keep them apart.
+  const r = lane ? 4.6 : 5.5
   return (
-    <svg viewBox="0 0 108 76" className="h-auto w-24 shrink-0 sm:w-28" role="img" aria-label="Court sketch">
+    <svg
+      viewBox="0 0 108 76"
+      className="h-auto w-24 shrink-0 sm:w-28"
+      role="img"
+      aria-label={lane ? "Court sketch, painted lane corners" : "Court sketch, half-court corners"}
+    >
       <polygon
-        points={corners.map((p) => p.join(",")).join(" ")}
+        points={SKETCH.half.map((p) => p.join(",")).join(" ")}
         className="fill-court-wrapper stroke-muted-foreground"
         strokeWidth={1.2}
       />
-      <polygon points="46,10 62,10 64,30 44,30" className="fill-none stroke-muted-foreground" strokeWidth={1} />
+      <polygon
+        points={SKETCH.lane.map((p) => p.join(",")).join(" ")}
+        className={cn("stroke-muted-foreground", lane ? "fill-brand-orange/15" : "fill-none")}
+        strokeWidth={1}
+      />
       <circle cx={54} cy={15} r={2.2} className="fill-none stroke-muted-foreground" strokeWidth={1} />
-      {corners.map(([x, y], i) => {
+      {SKETCH[landmarks].map(([x, y], i) => {
         const done = i < next
         const isNext = i === next
         return (
           <g key={i}>
-            {isNext && <circle cx={x} cy={y} r={8} className="fill-none stroke-brand-orange" strokeWidth={2} />}
+            {isNext && <circle cx={x} cy={y} r={r + 2.5} className="fill-none stroke-brand-orange" strokeWidth={2} />}
             <circle
               cx={x}
               cy={y}
-              r={5.5}
+              r={r}
               className={done ? "fill-foreground" : isNext ? "fill-brand-orange" : "fill-surface-1 stroke-border"}
               strokeWidth={1}
             />
@@ -215,7 +278,7 @@ function CourtSketch({ next }: { next: number }) {
               y={y}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize={7}
+              fontSize={lane ? 6 : 7}
               fontWeight={700}
               className={done ? "fill-background" : isNext ? "fill-white" : "fill-muted-foreground"}
             >
@@ -228,14 +291,19 @@ function CourtSketch({ next }: { next: number }) {
   )
 }
 
+const LANDMARK_OPTIONS = LANDMARK_ORDER.map((value) => ({ value, label: LANDMARK_SETS[value].label }))
+
 /**
- * Steps, the sketch, Undo / Reset / Cancel and the view's one orange button, Save. Escape cancels and Backspace undoes
- * (not while saving). Save posts the frame and points; a 200 hands the refreshed job back through `onSaved`.
+ * The landmark choice (lane corners first), steps, the sketch, Undo / Reset / Cancel and the view's one orange button,
+ * Save. Switching the landmark set clears the marks. Escape cancels and Backspace undoes (not while saving). Save posts
+ * the frame, points and landmark set; a 200 hands the refreshed job back through `onSaved`.
  */
 export function CalibrationPanel({
   jobId,
   frame,
   points,
+  landmarks,
+  onLandmarks,
   onUndo,
   onReset,
   onCancel,
@@ -244,6 +312,8 @@ export function CalibrationPanel({
   jobId: string
   frame: number
   points: Point[]
+  landmarks: Landmarks
+  onLandmarks: (landmarks: Landmarks) => void
   onUndo: () => void
   onReset: () => void
   onCancel: () => void
@@ -256,6 +326,7 @@ export function CalibrationPanel({
   const step = points.length
   const full = step === 4
   const convex = full && isConvexQuad(points)
+  const set = LANDMARK_SETS[landmarks]
 
   React.useEffect(() => {
     panelRef.current?.focus({ preventScroll: true })
@@ -303,7 +374,7 @@ export function CalibrationPanel({
       const res = await fetch(`/api/film/jobs/${encodeURIComponent(jobId)}/calibrate`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ frame, points }),
+        body: JSON.stringify({ frame, points, landmarks }),
         signal: controller.signal,
       })
       const body = (await res.json().catch(() => null)) as (FilmJob & { error?: string }) | null
@@ -324,9 +395,9 @@ export function CalibrationPanel({
   }
 
   let instruction: string
-  if (!full) instruction = `Step ${step + 1} of 4. ${CORNERS[step]?.tap ?? ""}`
-  else if (!convex) instruction = "Those corners cross over. Undo and tap them in the order shown."
-  else instruction = "All four corners marked. Save to redraw the court from them."
+  if (!full) instruction = `Step ${step + 1} of 4. ${set.corners[step]?.tap ?? ""}`
+  else if (!convex) instruction = "Those points cross over. Undo and tap them in the order shown."
+  else instruction = "All four points marked. Save to redraw the court from them."
 
   return (
     <section
@@ -335,8 +406,18 @@ export function CalibrationPanel({
       aria-labelledby="calibrate-title"
       className="space-y-3 rounded-md border border-border bg-surface-1 p-4 outline-none"
     >
+      <fieldset disabled={saving} className="min-w-0">
+        <legend className="sr-only">What to mark</legend>
+        <Segmented<Landmarks>
+          label="What to mark"
+          options={LANDMARK_OPTIONS}
+          value={landmarks}
+          onChange={(next) => next !== landmarks && onLandmarks(next)}
+          className="flex-wrap"
+        />
+      </fieldset>
       <div className="flex items-start gap-3">
-        <CourtSketch next={step} />
+        <CourtSketch next={step} landmarks={landmarks} />
         <div className="min-w-0 space-y-1">
           <h2 id="calibrate-title" className="text-sm font-semibold">
             Fix court position
@@ -345,7 +426,7 @@ export function CalibrationPanel({
             {instruction}
           </p>
           <p className="text-xs text-muted-foreground text-pretty">
-            Use a frame where all four corners show; Cancel to move the video.
+            {set.frameHint}; Cancel to move the video.
             <span className="hidden sm:inline"> Esc cancels, Backspace undoes.</span>
           </p>
         </div>

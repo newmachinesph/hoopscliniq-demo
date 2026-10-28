@@ -53,11 +53,13 @@ export interface CameraMotion {
 /** A point in clip.mp4 pixels. */
 export type ClipPoint = [number, number]
 
-/** 0.3.0: the court corners the homography uses, estimated by the backend or marked by the coach. */
+/** 0.3.0: the court points the homography uses, estimated by the backend or marked by the coach. */
 export interface Calibration {
   source: "estimated" | "coach" | string
   frame: number
   points: ClipPoint[]
+  /** 0.3.1: what the points mark, lane corners or half-court corners; missing means half-court corners. */
+  landmarks?: "lane" | "half" | string
 }
 
 /** The play-dna fields this app reads; court.js validates the rest. */

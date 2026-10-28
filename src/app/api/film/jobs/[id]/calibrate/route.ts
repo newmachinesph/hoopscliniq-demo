@@ -2,7 +2,8 @@ import { mockJob } from "@/data/hackathon"
 import { proxyOrMock } from "@/lib/api-proxy"
 import { JOB_ID } from "@/lib/film-job"
 
-// Proxies to the backend's POST /film/jobs/<id>/calibrate: the coach's four court corners on one frame. The backend
+// Proxies to the backend's POST /film/jobs/<id>/calibrate: the coach's four court points on one frame (lane corners or
+// half-court corners, per `landmarks`). The backend
 // re-projects the stored tracks, renames the play and returns the job view. Muse Spark naming can take most of a minute.
 const CALIBRATE_TIMEOUT_MS = 60_000
 
@@ -17,18 +18,24 @@ function clientError(status: number): string {
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
 
-/** { frame, points: four [x, y] } in clip.mp4 pixels, or null. The backend checks the bounds and the shape. */
-function parseBody(body: unknown): { frame: number; points: [number, number][] } | null {
+type Landmarks = "lane" | "half"
+
+/**
+ * { frame, points: four [x, y], landmarks? } in clip.mp4 pixels, or null. The backend checks the bounds and the shape;
+ * without `landmarks` it reads the points as half-court corners.
+ */
+function parseBody(body: unknown): { frame: number; points: [number, number][]; landmarks?: Landmarks } | null {
   if (!body || typeof body !== "object") return null
-  const { frame, points } = body as { frame?: unknown; points?: unknown }
+  const { frame, points, landmarks } = body as { frame?: unknown; points?: unknown; landmarks?: unknown }
   if (!isNum(frame) || !Number.isInteger(frame) || frame < 0) return null
+  if (landmarks !== undefined && landmarks !== "lane" && landmarks !== "half") return null
   if (!Array.isArray(points) || points.length !== 4) return null
   const clean: [number, number][] = []
   for (const p of points) {
     if (!Array.isArray(p) || p.length !== 2 || !isNum(p[0]) || !isNum(p[1]) || p[0] < 0 || p[1] < 0) return null
     clean.push([p[0], p[1]])
   }
-  return { frame, points: clean }
+  return landmarks === undefined ? { frame, points: clean } : { frame, points: clean, landmarks }
 }
 
 export async function POST(request: Request, { params }: RouteContext<"/api/film/jobs/[id]/calibrate">) {

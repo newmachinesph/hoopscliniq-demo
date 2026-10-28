@@ -1,6 +1,7 @@
-// Court calibration: the coach taps four corners of the attacked half on the paused video. This file maps a tap on the
-// displayed video to clip.mp4 pixels and checks the shape before it is sent. No path aliases here, so a plain Node
-// script can import it for a unit check.
+// Court calibration: the coach taps four court landmarks on the paused video, either the corners of the painted lane
+// (recommended: almost always on screen) or the corners of the attacked half. This file maps a tap on the displayed
+// video to clip.mp4 pixels and checks the shape before it is sent. No path aliases here, so a plain Node script can
+// import it for a unit check.
 
 /** A point in clip.mp4 pixels: [x, y]. */
 export type Point = [number, number]
@@ -14,13 +15,48 @@ export interface Rect {
 
 export type ObjectFit = "contain" | "cover" | "fill" | "none" | "scale-down"
 
-/** The four corners in the order the backend expects (POST /film/jobs/{id}/calibrate). */
-export const CORNERS = [
-  { label: "Baseline, left corner", tap: "Tap where the baseline meets the left sideline." },
-  { label: "Baseline, right corner", tap: "Tap where the baseline meets the right sideline." },
-  { label: "Half-court line, right sideline", tap: "Tap where the half-court line meets the right sideline." },
-  { label: "Half-court line, left sideline", tap: "Tap where the half-court line meets the left sideline." },
-] as const
+/** What the four points mark (backend 0.3.1 `landmarks`). */
+export type Landmarks = "lane" | "half"
+
+export interface LandmarkSet {
+  /** The choice's label in the panel. */
+  label: string
+  /** Which frame to pick before tapping. */
+  frameHint: string
+  /** The four points in the order the backend expects (POST /film/jobs/{id}/calibrate). */
+  corners: readonly { label: string; tap: string }[]
+}
+
+/** The two landmark sets, lane first: it is the recommended one and the default. */
+export const LANDMARK_SETS: Record<Landmarks, LandmarkSet> = {
+  lane: {
+    label: "Lane corners (recommended)",
+    frameHint: "Use a frame where the whole painted lane shows",
+    corners: [
+      { label: "Baseline, left lane corner", tap: "Tap where the left side of the painted lane meets the baseline." },
+      { label: "Baseline, right lane corner", tap: "Tap where the right side of the painted lane meets the baseline." },
+      { label: "Free-throw line, right end", tap: "Tap the right end of the free-throw line, at the lane's edge." },
+      { label: "Free-throw line, left end", tap: "Tap the left end of the free-throw line, at the lane's edge." },
+    ],
+  },
+  half: {
+    label: "Half-court corners",
+    frameHint: "Use a frame where all four corners of the half court show",
+    corners: [
+      { label: "Baseline, left corner", tap: "Tap where the baseline meets the left sideline." },
+      { label: "Baseline, right corner", tap: "Tap where the baseline meets the right sideline." },
+      { label: "Half-court line, right sideline", tap: "Tap where the half-court line meets the right sideline." },
+      { label: "Half-court line, left sideline", tap: "Tap where the half-court line meets the left sideline." },
+    ],
+  },
+}
+
+export const LANDMARK_ORDER: readonly Landmarks[] = ["lane", "half"]
+
+/** True when the point lies on the video picture (clip.mp4 pixels, edges included). */
+export function insideFrame(p: Point, size: readonly [number, number]): boolean {
+  return p[0] >= 0 && p[1] >= 0 && p[0] <= size[0] && p[1] <= size[1]
+}
 
 /**
  * Where the video picture sits inside its element box (letterbox or pillarbox bars excluded), and its scale on each
