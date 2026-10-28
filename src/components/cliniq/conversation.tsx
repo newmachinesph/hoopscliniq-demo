@@ -4,6 +4,7 @@ import {
   ArrowUpIcon,
   CaretDownIcon,
   CheckIcon,
+  CircleNotchIcon,
   InfoIcon,
   LockSimpleIcon,
   MicrophoneIcon,
@@ -47,21 +48,6 @@ import { ApprovalFlow, type DecisionState } from "./approval-flow"
 
 function Paragraph({ text, citations }: { text: string; citations: Citation[] }) {
   return <p>{renderCited(text, citations)}</p>
-}
-
-/** Split a paragraph into streamable words, keeping a **bold run** in one piece so markup never renders half-open. */
-function tokenize(text: string): string[] {
-  const out: string[] = []
-  let buf = ""
-  for (const word of text.split(/(?<=\s)/)) {
-    buf += word
-    if ((buf.match(/\*\*/g)?.length ?? 0) % 2 === 0) {
-      out.push(buf)
-      buf = ""
-    }
-  }
-  if (buf) out.push(buf)
-  return out
 }
 
 export function ProposalCard({ proposal }: { proposal: CliniqProposal }) {
@@ -120,7 +106,10 @@ function LockedProposal({ proposal, onAllow }: { proposal: CliniqProposal; onAll
   )
 }
 
-type Phase = "running" | "streaming" | "done"
+type Phase = "pending" | "done"
+
+/** Where an answer came from: the backend (x-demo: live), the sample data, or nowhere (the request failed). */
+type Source = "live" | "mock"
 
 interface Turn {
   id: number
@@ -128,23 +117,20 @@ interface Turn {
   answer: CliniqAnswer
   mode: CliniqMode
   phase: Phase
-  /** Run step in progress while `running`. */
-  step: number
-  /** Words shown while `streaming`. */
-  words: number
-  total: number
-  stopped?: boolean
+  source: Source
+  /** The backend found nothing in the coach's film, plays or stats to answer from. */
+  noSource?: boolean
+  /** Friendly message when the request failed or was rejected. */
+  error?: string
 }
 
-const STEP_MS = 520
-const WORD_MS = 40
-const WORDS_PER_TICK = 2
-const REDUCED_MS = 600
+const EMPTY_ANSWER: CliniqAnswer = { match: [], body: [], citations: [], credits: 0 }
+const LIVE_LOW_CONFIDENCE = "The sources are thin. Treat this as a lean, not a pattern."
+const ASK_ERROR = "ClinIQ could not answer just now. Your question is still in the box. Try again in a moment."
 
 function makeTurn(id: number, question: string, mode: CliniqMode, phase: Phase): Turn {
-  const answer = answerFor(question)
-  const total = answer.body.reduce((sum, p) => sum + tokenize(p).length, 0)
   const done = phase === "done"
+  const answer = done ? answerFor(question) : EMPTY_ANSWER
   return {
     id,
     question,
@@ -152,49 +138,66 @@ function makeTurn(id: number, question: string, mode: CliniqMode, phase: Phase):
     // An explicit Analyze or Plan pick wins; in Ask mode the answer reports what it actually did.
     mode: mode !== "ask" ? mode : (answer.mode ?? "ask"),
     phase,
-    step: done ? (answer.steps?.length ?? 0) : 0,
-    words: done ? total : 0,
-    total,
+    source: "mock",
   }
 }
 
-function advance(turn: Turn, reduced: boolean): Turn {
-  const steps = turn.answer.steps?.length ?? 0
-  // Reduced motion: no ticking steps, no streaming; the answer appends in one go.
-  if (reduced) return { ...turn, phase: "done", step: steps, words: turn.total }
-  if (turn.phase === "running") {
-    const step = turn.step + 1
-    return step >= steps ? { ...turn, step, phase: "streaming" } : { ...turn, step }
-  }
-  const words = turn.words + WORDS_PER_TICK
-  return words >= turn.total ? { ...turn, words: turn.total, phase: "done" } : { ...turn, words }
+interface AskResponse {
+  answer?: { body?: unknown; citations?: unknown; confidence?: unknown; credits?: unknown }
+  noSource?: unknown
 }
 
-const REDUCED_QUERY = "(prefers-reduced-motion: reduce)"
-
-function useReducedMotion() {
-  return React.useSyncExternalStore(
-    (onChange) => {
-      const media = window.matchMedia(REDUCED_QUERY)
-      media.addEventListener("change", onChange)
-      return () => media.removeEventListener("change", onChange)
+/** POST /api/cliniq/ask. Throws a friendly Error on a 4xx/5xx or an unreadable body. */
+async function fetchAnswer(question: string, signal: AbortSignal): Promise<Partial<Turn>> {
+  const res = await fetch("/api/cliniq/ask", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question }),
+    signal,
+  })
+  const live = res.headers.get("x-demo") === "live"
+  let data: AskResponse & { error?: unknown } = {}
+  try {
+    data = await res.json()
+  } catch {}
+  if (!res.ok) {
+    throw new Error(res.status === 400 && typeof data.error === "string" ? data.error : ASK_ERROR)
+  }
+  const body = Array.isArray(data.answer?.body)
+    ? data.answer.body.filter((p): p is string => typeof p === "string")
+    : []
+  if (body.length === 0) throw new Error(ASK_ERROR)
+  const noSource = data.noSource === true
+  const citations = noSource
+    ? []
+    : ((Array.isArray(data.answer?.citations) ? data.answer.citations : []) as CliniqAnswer["citations"])
+  const credits = typeof data.answer?.credits === "number" ? data.answer.credits : 1
+  const confidence = typeof data.answer?.confidence === "string" ? data.answer.confidence : undefined
+  // The sample answer keeps its steps, suggestions and proposal; the live answer has none of those fields.
+  const base = live ? EMPTY_ANSWER : answerFor(question)
+  return {
+    source: live ? "live" : "mock",
+    noSource,
+    answer: {
+      ...base,
+      body,
+      citations,
+      credits,
+      confidence: live ? (confidence === "low" ? LIVE_LOW_CONFIDENCE : undefined) : (confidence ?? base.confidence),
     },
-    () => window.matchMedia(REDUCED_QUERY).matches,
-    () => false,
-  )
+  }
 }
 
-function StreamedBody({ turn }: { turn: Turn }) {
-  const tokens = React.useMemo(() => turn.answer.body.map(tokenize), [turn.answer])
-  let offset = 0
+function PendingAnswer() {
   return (
-    <div className="space-y-2.5 text-[0.9375rem] leading-relaxed text-foreground-secondary">
-      {tokens.map((words, i) => {
-        const shown = Math.max(0, Math.min(words.length, turn.words - offset))
-        offset += words.length
-        if (shown === 0) return null
-        return <Paragraph key={i} text={words.slice(0, shown).join("")} citations={turn.answer.citations} />
-      })}
+    <div className="flex items-center gap-2 rounded-md border border-border px-3 py-3 text-sm text-foreground-secondary">
+      <CircleNotchIcon size={16} className="shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+      <div>
+        <p className="font-medium">ClinIQ is checking your film</p>
+        <p className="text-xs text-muted-foreground">
+          Reading your plays, film tags and stats. This can take up to 30 seconds.
+        </p>
+      </div>
     </div>
   )
 }
@@ -213,17 +216,40 @@ function AnswerView({
   onAllowChanges: () => void
 }) {
   const { answer, phase } = turn
-  const done = phase === "done"
-  const finished = done && !turn.stopped
+  if (phase === "pending") return <PendingAnswer />
+  if (turn.error) {
+    return (
+      <p
+        role="alert"
+        className="flex gap-2 rounded-sm border border-border px-3 py-2 text-sm text-foreground-secondary"
+      >
+        <InfoIcon size={16} className="mt-px shrink-0" aria-hidden />
+        {turn.error}
+      </p>
+    )
+  }
   const sourceCount = answer.citations.length
 
   return (
-    <div className="space-y-3" aria-busy={!done}>
-      <AgentRun steps={answer.steps ?? []} current={turn.step} running={phase === "running"} agent={answer.agent} />
-      {phase !== "running" && <StreamedBody turn={turn} />}
-      {turn.stopped && <p className="text-xs text-muted-foreground">Stopped before the answer finished.</p>}
+    <div className="space-y-3">
+      {answer.steps && answer.steps.length > 0 && (
+        <AgentRun steps={answer.steps} current={answer.steps.length} running={false} agent={answer.agent} />
+      )}
+      <div
+        className={cn(
+          "space-y-2.5 text-[0.9375rem] leading-relaxed text-foreground-secondary",
+          turn.noSource && "rounded-md border border-dashed border-border-strong px-3 py-2.5",
+        )}
+      >
+        {turn.noSource && (
+          <p className="text-xs font-semibold text-foreground">No source in your film, plays or stats</p>
+        )}
+        {answer.body.map((text, i) => (
+          <Paragraph key={i} text={text} citations={answer.citations} />
+        ))}
+      </div>
 
-      {finished && answer.confidence && (
+      {answer.confidence && (
         <p className="flex gap-2 rounded-sm border border-border px-3 py-2 text-xs text-muted-foreground">
           <InfoIcon size={14} className="mt-px shrink-0" aria-hidden />
           <span>
@@ -233,46 +259,45 @@ function AnswerView({
         </p>
       )}
 
-      {done && (
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground tabular-nums">
-            {sourceCount > 0 && onShowSources ? (
-              <button
-                type="button"
-                onClick={() => onShowSources(answer)}
-                className="inline-flex min-h-7 items-center gap-1 rounded-full border border-border px-2 transition-colors hover:border-border-strong hover:text-foreground max-md:min-h-11"
-              >
-                {sourceCount} {sourceCount === 1 ? "source" : "sources"}
-              </button>
-            ) : (
-              <span>
-                {sourceCount > 0 ? `${sourceCount} ${sourceCount === 1 ? "source" : "sources"}` : "No sources found"}
-              </span>
-            )}
-            <span aria-hidden>·</span>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground tabular-nums">
+          <span>{turn.source === "live" ? "Answered by Muse Spark from your film" : "Sample answer"}</span>
+          <span aria-hidden>·</span>
+          {sourceCount > 0 && onShowSources ? (
+            <button
+              type="button"
+              onClick={() => onShowSources(answer)}
+              className="inline-flex min-h-7 items-center gap-1 rounded-full border border-border px-2 transition-colors hover:border-border-strong hover:text-foreground max-md:min-h-11"
+            >
+              {sourceCount} {sourceCount === 1 ? "source" : "sources"}
+            </button>
+          ) : (
             <span>
-              {answer.credits} {answer.credits === 1 ? "credit" : "credits"}
+              {sourceCount > 0 ? `${sourceCount} ${sourceCount === 1 ? "source" : "sources"}` : "No sources found"}
             </span>
-            {answer.tier && (
-              <>
-                <span aria-hidden>·</span>
-                <span>{answer.tier} model</span>
-              </>
-            )}
-          </p>
-          {finished && <AnswerFeedback citations={answer.citations} />}
-        </div>
-      )}
+          )}
+          <span aria-hidden>·</span>
+          <span>
+            {answer.credits} {answer.credits === 1 ? "credit" : "credits"}
+          </span>
+          {answer.tier && (
+            <>
+              <span aria-hidden>·</span>
+              <span>{answer.tier} model</span>
+            </>
+          )}
+        </p>
+        {!turn.noSource && <AnswerFeedback citations={answer.citations} />}
+      </div>
 
-      {finished &&
-        answer.proposal &&
+      {answer.proposal &&
         (canChange ? (
           <ProposalCard proposal={answer.proposal} />
         ) : (
           <LockedProposal proposal={answer.proposal} onAllow={onAllowChanges} />
         ))}
 
-      {finished && answer.suggestions && (
+      {answer.suggestions && (
         <div className="flex flex-wrap gap-1.5">
           {answer.suggestions.map((s) => (
             <button
@@ -359,48 +384,55 @@ export function Conversation({
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const pinned = React.useRef(true)
   const asked = React.useRef<string | null>(null)
-  const reduced = useReducedMotion()
+  const controller = React.useRef<AbortController | null>(null)
 
   const last = turns.at(-1)
-  const busy = last !== undefined && last.phase !== "done"
+  const busy = last?.phase === "pending"
 
   const ask = React.useCallback(
     (question: string) => {
       const q = question.trim()
-      if (!q) return
+      // One question at a time: resending is disabled while an answer is pending.
+      if (!q || controller.current) return
       pinned.current = true
-      setTurns((t) => {
-        // One run at a time: a new question finishes whatever was still streaming.
-        const settled = t.map((turn) =>
-          turn.phase === "done" ? turn : { ...turn, phase: "done" as const, words: turn.total },
-        )
-        return [...settled, makeTurn(nextId.current++, q, mode, "running")]
-      })
+      const id = nextId.current++
+      const abort = new AbortController()
+      controller.current = abort
+      setTurns((t) => [...t, makeTurn(id, q, mode, "pending")])
       setDraft("")
+      fetchAnswer(q, abort.signal)
+        .then((result) => {
+          setTurns((t) =>
+            t.map((turn) =>
+              turn.id === id
+                ? {
+                    ...turn,
+                    ...result,
+                    phase: "done" as const,
+                    mode: mode !== "ask" ? mode : (result.answer?.mode ?? "ask"),
+                  }
+                : turn,
+            ),
+          )
+        })
+        .catch((err: unknown) => {
+          if (abort.signal.aborted) return
+          const error = err instanceof Error ? err.message : ASK_ERROR
+          setTurns((t) => t.map((turn) => (turn.id === id ? { ...turn, phase: "done" as const, error } : turn)))
+          setDraft((d) => d || q)
+        })
+        .finally(() => {
+          if (controller.current === abort) controller.current = null
+        })
     },
     [mode],
   )
 
   const stop = () => {
-    setTurns((t) =>
-      t.flatMap((turn) => {
-        if (turn.phase === "running") return []
-        if (turn.phase === "streaming") return [{ ...turn, phase: "done" as const, stopped: true }]
-        return [turn]
-      }),
-    )
+    controller.current?.abort()
+    controller.current = null
+    setTurns((t) => t.filter((turn) => turn.phase !== "pending"))
   }
-
-  // Drive the active run: tick steps, then stream words. Re-arms on every change, so one timer is live at most.
-  React.useEffect(() => {
-    const active = turns.at(-1)
-    if (!active || active.phase === "done") return
-    const delay = reduced ? REDUCED_MS : active.phase === "running" ? STEP_MS : WORD_MS
-    const timer = setTimeout(() => {
-      setTurns((ts) => ts.map((t) => (t.id === active.id ? advance(t, reduced) : t)))
-    }, delay)
-    return () => clearTimeout(timer)
-  }, [turns, reduced])
 
   React.useEffect(() => {
     if (initialPrompt && asked.current !== initialPrompt) {
@@ -409,12 +441,15 @@ export function Conversation({
     }
   }, [initialPrompt, ask])
 
+  // Leaving the page cancels a pending question.
+  React.useEffect(() => () => controller.current?.abort(), [])
+
   // Tell the parent about the latest finished answer.
   const onAnswerRef = React.useRef(onAnswer)
   React.useEffect(() => {
     onAnswerRef.current = onAnswer
   })
-  const lastDone = [...turns].reverse().find((t) => t.phase === "done")
+  const lastDone = [...turns].reverse().find((t) => t.phase === "done" && !t.error)
   const lastDoneId = lastDone?.id
   // biome-ignore lint/correctness/useExhaustiveDependencies: fire once per finished turn, not on every render
   React.useEffect(() => {
@@ -459,6 +494,7 @@ export function Conversation({
                     key={p}
                     type="button"
                     onClick={() => ask(p)}
+                    disabled={busy}
                     className="min-h-11 rounded-md border border-border bg-surface-1 px-3 py-2.5 text-left text-sm transition-colors hover:border-border-strong"
                   >
                     {p}
@@ -485,7 +521,7 @@ export function Conversation({
             ))
           )}
           <p className="sr-only" role="status">
-            {busy ? "ClinIQ is answering" : last ? "ClinIQ answered" : ""}
+            {busy ? "ClinIQ is checking your film" : last ? "ClinIQ answered" : ""}
           </p>
         </div>
       </div>
@@ -494,7 +530,7 @@ export function Conversation({
         className={cn("border-t border-border bg-background", compact ? "p-3" : "py-3")}
         onSubmit={(e) => {
           e.preventDefault()
-          ask(draft)
+          if (!busy) ask(draft)
         }}
       >
         <div className={cn(!compact && column)}>
@@ -514,7 +550,7 @@ export function Conversation({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault()
-                  ask(draft)
+                  if (!busy) ask(draft)
                 }
               }}
               rows={2}
@@ -563,8 +599,7 @@ export function Conversation({
             </div>
           </div>
           <p className="mt-2 text-center text-[0.6875rem] text-muted-foreground">
-            Demo answers are prewritten. ClinIQ cites its sources and never sends anything to players or parents without
-            your approval.
+            ClinIQ cites its sources and never sends anything to players or parents without your approval.
           </p>
         </div>
       </form>
