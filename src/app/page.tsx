@@ -24,6 +24,7 @@ import {
   type DemoStep,
   demoFlow,
   hackathon,
+  measuredNote,
   measuredResults,
   modelRows,
   passLines,
@@ -261,7 +262,7 @@ export default function HackathonPage() {
 
         <Section id="testing" title="How we test">
           <p className="max-w-2xl text-foreground-secondary text-pretty">
-            Tracks and tags are scored against hand-labelled clips. These are the pass lines we hold ourselves to before
+            Tracks and tags are scored against checked reference clips. These are the pass lines we hold ourselves to before
             we sell film tagging:
           </p>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -311,6 +312,14 @@ export default function HackathonPage() {
               </tbody>
             </table>
           </div>
+          {measuredResults.length > 0 && (
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground text-pretty">
+              {measuredNote.text}{" "}
+              <a href={measuredNote.href} className="underline underline-offset-2 hover:text-foreground">
+                {measuredNote.linkLabel}
+              </a>
+            </p>
+          )}
         </Section>
 
         <Section id="team" title="Team, track and links">

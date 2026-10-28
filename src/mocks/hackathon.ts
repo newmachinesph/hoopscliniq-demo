@@ -82,7 +82,10 @@ export const modelRows: ModelRow[] = [
     id: "modal",
     name: "Modal",
     host: "GPU jobs",
-    jobs: ["Video pipeline: ffmpeg frames, SAM tracking, play-dna JSON", "Eval harness against hand-labelled clips"],
+    jobs: [
+      "Video pipeline: ffmpeg frames, SAM tracking, play-dna JSON",
+      "Eval harness against checked reference clips",
+    ],
     status: "live",
   },
   {
@@ -137,8 +140,29 @@ export interface MeasuredResult {
   measuredOn: string
 }
 
-/** Empty on purpose: rows go here only after the eval harness runs on hand-labelled clips. */
-export const measuredResults: MeasuredResult[] = []
+/**
+ * Only numbers from hoopscliniq-ai `eval/results/summary.json` (backend 0.3.2, `python -m eval.run`). Reference boxes
+ * were checked by an AI vision model, not a person: see `measuredNote`.
+ */
+const EVAL_SET = "5 clips, 40 frames"
+const EVAL_DATE = "Oct 28, 2026"
+
+export const measuredResults: MeasuredResult[] = [
+  { measure: "Player boxes: precision", result: "83%", clips: EVAL_SET, measuredOn: EVAL_DATE },
+  { measure: "Player boxes: recall", result: "86%", clips: EVAL_SET, measuredOn: EVAL_DATE },
+  { measure: "Camera motion followed", result: "1,200 of 1,200 frames", clips: "5 clips", measuredOn: EVAL_DATE },
+  { measure: "Upload to finished play, mean", result: "109 s", clips: "5 clips", measuredOn: EVAL_DATE },
+  { measure: "SAM 3.1 cost per 20 s clip", result: "$0.10", clips: "5 clips", measuredOn: EVAL_DATE },
+]
+
+export const measuredNote = {
+  text:
+    "Live-play clips the pipeline was never tuned on. A box counts when its overlap with a reference box is at least half of their combined area " +
+    "(IoU 0.5). The reference boxes were checked by an AI vision model, not yet by a person. Possessions, shots and " +
+    "screens are not measured yet.",
+  href: "https://github.com/newmachinesph/hoopscliniq-ai/blob/main/eval/results/summary.md",
+  linkLabel: "Full eval table",
+}
 
 // ---------- Mock API payloads (src/app/api/*). The backend replaces these. ----------
 
