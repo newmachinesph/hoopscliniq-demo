@@ -4,11 +4,17 @@ Hoops ClinIQ turns a coach's phone video of a basketball game into tagged plays 
 
 This is the web app for the **Meta Global AI Developer Hackathon 2026** (Indie developer track, theme: Build for Your
 World). It is the Hoops ClinIQ coach app cut down to the core loop: Record → Tag → Ask → Study, plus hiding a player
-without consent. The backend that runs SAM 3.1 and Muse Spark is
-[hoopscliniq-ai](https://github.com/newmachinesph/hoopscliniq-ai).
+without consent.
 
 - Live: https://web--demo--mnlqynqt4mjy.code.run (no sign-in; start at `/demo`)
 - **The submission writeup (problem, Meta models, measured results, the 90-second video) is [SUBMISSION.md](SUBMISSION.md).**
+
+## The two repos
+
+| Repo | What it is | Runs on |
+| ---- | ---------- | ------- |
+| **hoopscliniq-demo** (this repo) | The web app (Next.js): Record → Tag → Ask → Study. Its `/api` routes proxy to the backend and fall back to sample data when it is unreachable. | Northflank |
+| [hoopscliniq-ai](https://github.com/newmachinesph/hoopscliniq-ai) | The backend (FastAPI): SAM 3.1 player and ball tracking, court mapping, Muse Spark play naming, ClinIQ answers, study quizzes, the consent mask. Its README has the pipeline, the API and the [measured results](https://github.com/newmachinesph/hoopscliniq-ai/blob/main/eval/results/summary.md). | Modal |
 
 The team, its games, stats and playbook are sample data for a fictional team (the Lakeshore Lions). The two sample
 clips are real game footage (see Attribution).
